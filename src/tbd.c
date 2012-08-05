@@ -2,17 +2,62 @@
  *  
  *  Tiny Basic Datastore.
  *
- *  Implementation of tbd.  All tbd confinguration and functionality is placed in this file.
+ *  Implementation of tbd.  All tbd configuration and functionality is placed in this file.
  *
+ *
+ *          TBD Memory Model
+ *          ================
+ *    |                          |
+ *    +--------------------------+
+ *    | tbd header information   | <-- tbd start address
+ *    | ...                      |
+ *    +--------------------------+
+ *    | tbd bottom of stack      | <-- last (oldest) stack element
+ *    | ...                      |
+ *    |-                         |
+ *    | ...                      |
+ *    |-                         |
+ *    | tbd top of stack         | <-- first (newest) stack element
+ *    | ...                      |
+ *    +--------------------------+
+ *    |                          |
+ *    | ... available memory ... |
+ *    |                          |
+ *    +--------------------------+
+ *    | tbd top of heap          | <-- newest heap data
+ *    | ...                      |
+ *    | tbd bottom of heap       | <-- oldest heap data
+ *    +--------------------------+
+ *    |                          | <-- tbd start address + tbd size
+ * 
  */
+
+
 
 
 #include "tbd.h"
 
-#include <assert.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdio.h>
+
+
+
+
+/* Optional support
+ * Comment out and functionality that shouldn't be inluded in the library.
+ */
+#define TBD_INCLUDE_ASSERT
+#define TBD_INCLUDE_STDIO
+
+
+#if defined(TBD_INCLUDE_ASSERT)
+  #include <assert.h>
+#endif
+
+
+#if defined(TBD_INCLUDE_STDIO)
+  #include <stdio.h>
+#endif
 
 
 
@@ -56,8 +101,8 @@ static void tbd_key_clear(tbd_key_t* key)
  */
 typedef struct tbd_value_struct
 {
-  void* data;     /**< Pointer to generic stored data. */
-  size_t size;    /**< Size in bytes of generic stored data. */
+  unsigned char* data;     ///< Pointer to generic stored data. */
+  size_t size;             ///< Size in bytes of generic stored data. */
   
 } tbd_value_t;
 
@@ -84,8 +129,8 @@ static void tbd_value_clear(tbd_value_t* value)
  */
 typedef struct tbd_heap_struct
 {
-  void* top;       ///< Pointer to top of heap.
-  size_t size;     ///< Size in bytes of allocated heap. 
+  unsigned char* top;       ///< Pointer to top of heap.
+  size_t size;              ///< Size in bytes of allocated heap. 
   
 } tbd_heap_t;
 
@@ -123,12 +168,12 @@ static int tbd_heap_is_empty(tbd_heap_t* heap)
 
 
 
-static void* tbd_heap_push(tbd_heap_t* heap, size_t hunk_size)
+static unsigned char* tbd_heap_push(tbd_heap_t* heap, size_t hunk_size)
 {
   TBD_ASSERT(heap);
   
   heap->size += hunk_size;
-  heap->top -= hunk_size / sizeof(void*);  // heap grows into lower memory addresses
+  heap->top -= hunk_size;  // heap grows into lower memory addresses
   
   return heap->top;
 }
@@ -136,12 +181,12 @@ static void* tbd_heap_push(tbd_heap_t* heap, size_t hunk_size)
 
 
 
-static void* tbd_heap_pop(tbd_heap_t* heap, size_t hunk_size)
+static unsigned char* tbd_heap_pop(tbd_heap_t* heap, size_t hunk_size)
 {
   TBD_ASSERT(heap);
   
   heap->size -= hunk_size;
-  heap->top += hunk_size / sizeof(void*);  // heap grows into lower memory addresses
+  heap->top += hunk_size;  // heap grows into lower memory addresses
   
   return heap->top;
 }
@@ -240,6 +285,144 @@ static size_t tbd_keyvalue_garbage_size(const tbd_keyvalue_t* keyvalue)
 
 
 
+/** Simple iterator structure for stack
+ */
+typedef struct tbd_keyvalue_stack_iterator_struct
+{
+  tbd_keyvalue_t* ptr;
+  
+} tbd_keyvalue_stack_iterator_t;
+
+
+
+
+/** Move iterator to next element.
+ */
+static tbd_keyvalue_t* tbd_keyvalue_stack_iterator_next(tbd_keyvalue_stack_iterator_t* self)
+{
+  --self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Move iterator to previous element.
+ */
+static tbd_keyvalue_t* tbd_keyvalue_stack_iterator_prev(tbd_keyvalue_stack_iterator_t* self)
+{
+  ++self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Simple iterator structure for stack
+ */
+typedef struct tbd_keyvalue_stack_reverse_iterator_struct
+{
+  tbd_keyvalue_t* ptr;
+  
+} tbd_keyvalue_stack_reverse_iterator_t;
+
+
+
+
+/** Move iterator to next element.
+ */
+static tbd_keyvalue_t* tbd_keyvalue_stack_reverse_iterator_next(tbd_keyvalue_stack_reverse_iterator_t* self)
+{
+  ++self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Move iterator to previous element.
+ */
+static tbd_keyvalue_t* tbd_keyvalue_stack_reverse_iterator_prev(tbd_keyvalue_stack_reverse_iterator_t* self)
+{
+  --self->ptr;
+  return self->ptr;
+}
+
+
+
+
+
+
+/** Simple const iterator structure for stack
+ */
+typedef struct tbd_keyvalue_stack_const_iterator_struct
+{
+  const tbd_keyvalue_t* ptr;
+  
+} tbd_keyvalue_stack_const_iterator_t;
+
+
+
+
+/** Move iterator to next element.
+ */
+static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_next(tbd_keyvalue_stack_const_iterator_t* self)
+{
+  --self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Move iterator to previous element.
+ */
+static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_prev(tbd_keyvalue_stack_const_iterator_t* self)
+{
+  ++self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Simple const iterator structure for stack
+ */
+typedef struct tbd_keyvalue_stack_const_reverse_iterator_struct
+{
+  const tbd_keyvalue_t* ptr;
+  
+} tbd_keyvalue_stack_const_reverse_iterator_t;
+
+
+
+
+/** Move iterator to next element.
+ */
+static const tbd_keyvalue_t* tbd_keyvalue_stack_const_reverse_iterator_next(tbd_keyvalue_stack_const_reverse_iterator_t* self)
+{
+  ++self->ptr;
+  return self->ptr;
+}
+
+
+
+
+/** Move iterator to previous element.
+ */
+static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_reverse_prev(tbd_keyvalue_stack_const_reverse_iterator_t* self)
+{
+  --self->ptr;
+  return self->ptr;
+}
+
+
+
+
+
+
+
+
 /** A simple stack structure.
  */
 typedef struct tbd_keyvalue_stack_struct
@@ -263,6 +446,8 @@ static void tbd_keyvalue_stack_clear(tbd_keyvalue_stack_t* stack)
 
 
 
+/** Empties the stack.
+ */
 static void tbd_keyvalue_stack_empty(tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
@@ -273,11 +458,19 @@ static void tbd_keyvalue_stack_empty(tbd_keyvalue_stack_t* stack)
 
 
 
+/** Returns pointer to top element on the stack.
+ *  Returns NULL if no elements exist.
+ */
 static tbd_keyvalue_t* tbd_keyvalue_stack_top(const tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
   
-  return stack->start + stack->count;
+  if (!stack->count)
+  {
+    return NULL;
+  }
+  
+  return stack->start + (stack->count - 1);
 }
 
 
@@ -309,6 +502,7 @@ static tbd_keyvalue_t* tbd_keyvalue_stack_push(tbd_keyvalue_stack_t* stack)
 
 
 
+
 static void tbd_keyvalue_stack_pop(tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
@@ -319,6 +513,70 @@ static void tbd_keyvalue_stack_pop(tbd_keyvalue_stack_t* stack)
 
 
 
+static tbd_keyvalue_stack_iterator_t tbd_keyvalue_stack_begin(tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  return (tbd_keyvalue_stack_iterator_t) 
+  {
+    .ptr = tbd_keyvalue_stack_top(stack)
+  };
+}
+
+
+
+
+static tbd_keyvalue_stack_const_iterator_t tbd_keyvalue_stack_const_begin(const tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  return (tbd_keyvalue_stack_const_iterator_t) 
+  {
+    .ptr = tbd_keyvalue_stack_top(stack)
+  };
+}
+
+
+
+
+static tbd_keyvalue_stack_const_iterator_t tbd_keyvalue_stack_end(const tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  return (tbd_keyvalue_stack_const_iterator_t) 
+  {
+    .ptr = stack->start - 1
+  };
+}
+
+
+
+
+static tbd_keyvalue_stack_reverse_iterator_t tbd_keyvalue_stack_rbegin(tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  return (tbd_keyvalue_stack_reverse_iterator_t) 
+  {
+    .ptr = stack->start
+  };
+}
+
+
+
+
+static tbd_keyvalue_stack_const_reverse_iterator_t tbd_keyvalue_stack_rend(const tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  return (tbd_keyvalue_stack_const_reverse_iterator_t) 
+  {
+    .ptr = tbd_keyvalue_stack_top(stack) + 1
+  };
+}
+
+
+
 
 
 
@@ -326,8 +584,8 @@ static void tbd_keyvalue_stack_pop(tbd_keyvalue_stack_t* stack)
  */
 typedef struct tbd_garbage_list_struct
 {
-  struct tbd_keyvalue_struct* front;   ///< Pointer to the front of a list of elements that can are garbage (can be garbage collected). 
-  struct tbd_keyvalue_struct* back;    ///< Pointer to the back of a list of elements that can are garbage (can be garbage collected).  
+  struct tbd_keyvalue_struct* front;   ///< Pointer to the front of a list of elements that are garbage (can be garbage collected). 
+  struct tbd_keyvalue_struct* back;    ///< Pointer to the back of a list of elements that are garbage (can be garbage collected).  
  
 } tbd_garbage_list_t;
 
@@ -380,6 +638,9 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
   if (!garbage->front)
   {
     garbage->front = keyvalue;
+    garbage->back = keyvalue;
+    keyvalue->prev_garbage = 0;
+    keyvalue->next_garbage = 0;
   }
   else
   {
@@ -496,29 +757,27 @@ static size_t tbd_keyvalue_hunk_size(const tbd_t* tbd, size_t key_size, size_t v
 static struct tbd_keyvalue_struct* tbd_create_keyvalue(tbd_t* tbd, size_t key_size, size_t value_size)
 {
   TBD_ASSERT(tbd);
-  TBD_ASSERT(tbd->hunk_size);
-  
+
   const size_t hunk_size = tbd_keyvalue_hunk_size(tbd, key_size, value_size);  
   
   // check there is enough room to add elements of that size
   tbd_keyvalue_t* stack_top = tbd_keyvalue_stack_push(&tbd->stack);
-  void* heap_top = tbd_heap_push(&tbd->heap, hunk_size);
+  unsigned char* heap_top = tbd_heap_push(&tbd->heap, hunk_size);
   
-  if (heap_top < (void*) stack_top)
+  if (heap_top < (unsigned char*) stack_top)
   {
     tbd_keyvalue_stack_pop(&tbd->stack);
     tbd_heap_pop(&tbd->heap, hunk_size);
     return 0;
   }
-    
-  // allocate from heap
+
   stack_top->heap.top = heap_top;  
   stack_top->heap.size = hunk_size;
   
   stack_top->value.data = heap_top;
   stack_top->value.size = value_size;
   
-  stack_top->key.str = heap_top + value_size / sizeof(void*);
+  stack_top->key.str = (char*) (heap_top + value_size);
   stack_top->key.size = key_size;
   
   // initialize garbage list node
@@ -532,27 +791,50 @@ static struct tbd_keyvalue_struct* tbd_create_keyvalue(tbd_t* tbd, size_t key_si
 
 
 
-static struct tbd_keyvalue_struct* tbd_keyvalue_find(const tbd_t* tbd, const char* key)
+/** Find a keyvalue struct with a given key.
+ *  Returns NULL if key was not found.
+ */
+static tbd_keyvalue_t* tbd_keyvalue_find(tbd_t* tbd, const char* key)
 {
   TBD_ASSERT(tbd);
   
+  if (!tbd->stack.count)
+  {
+    return NULL;
+  }
+  
   // a simple linear search for a given key
   // TODO convert to standard C search
-  struct tbd_keyvalue_struct* keyvalue_ptr = tbd->stack.start;
   
-  const tbd_keyvalue_t* end = tbd_keyvalue_stack_top(&tbd->stack);
+  tbd_keyvalue_stack_iterator_t iter = tbd_keyvalue_stack_begin(&tbd->stack);
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(&tbd->stack);
   
-  while (keyvalue_ptr != end)
+  if (!iter.ptr)
   {
-    if (!keyvalue_ptr->is_garbage && (strcmp(key, keyvalue_ptr->key.str) == 0))
+    return NULL;
+  }
+  
+  while (iter.ptr != end.ptr)
+  {
+    if (!iter.ptr->is_garbage && (strcmp(key, iter.ptr->key.str) == 0))
     {
-      return keyvalue_ptr;
+      return iter.ptr;
     }
     
-    ++keyvalue_ptr;
+    tbd_keyvalue_stack_iterator_next(&iter);
   }
   
   return 0;
+}
+
+
+
+
+static const tbd_keyvalue_t* tbd_keyvalue_find_const(const tbd_t* tbd, const char* key)
+{
+  // Cast away constness, then cast it back before returning.
+  // Allows the use of tbd_keyvalue_find function.
+  return (const tbd_keyvalue_t*) tbd_keyvalue_find((tbd_t*) tbd, key);
 }
 
 
@@ -724,10 +1006,12 @@ tbd_t* tbd_init(const tbd_init_t* init)
   tbd->hunk_size = init->hunk_size;
   
   // locate keyvalue list immediately after tbd struct
-  tbd->stack.start = (tbd_keyvalue_t*) (tbd + 1);  
+  tbd->stack.start = (tbd_keyvalue_t*) (tbd + 1);
+  tbd->stack.count = 0;
   
   // locate start of heap at end of allocated region
-  tbd->heap.top = init->start + init->size / sizeof(void*);
+  tbd->heap.top = ((unsigned char*) init->start) + init->size;
+  tbd->heap.size = 0;
   
   return tbd;
 }
@@ -759,7 +1043,27 @@ size_t tbd_garbage_size(const tbd_t* tbd)
   if (ptr)
   {
     result = tbd_keyvalue_garbage_size(ptr); 
- }
+  }
+  
+  return result;
+}
+
+
+
+
+/** Returns number of garbage keyvalue elements in tbd.
+ */
+size_t tbd_garbage_count(const tbd_t* tbd)
+{
+  size_t result = 0;
+
+  tbd_keyvalue_t* ptr = tbd->garbage.front;
+  
+  while (ptr)
+  {
+    ++result;
+    ptr = ptr->next_garbage;
+  }
   
   return result;
 }
@@ -796,7 +1100,7 @@ size_t tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
     
     pop_total += keyvalue_size;
     
-    size_t pop_offset = ptr->heap.size / sizeof(void*);
+    size_t pop_offset = ptr->heap.size;
     tbd->heap.top += pop_offset;
     
     --tbd->stack.count;
@@ -832,38 +1136,44 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
   size_t garbage_total = 0;
   size_t stack_index = 0; 
 
+  tbd_keyvalue_stack_iterator_t top = tbd_keyvalue_stack_begin(&tbd->stack);
+  tbd_keyvalue_stack_const_iterator_t top_end = tbd_keyvalue_stack_end(&tbd->stack);
   
-  while (garbage_total < garbage_limit)
+  tbd_keyvalue_stack_reverse_iterator_t btm = tbd_keyvalue_stack_rbegin(&tbd->stack);
+  tbd_keyvalue_stack_const_reverse_iterator_t btm_end = tbd_keyvalue_stack_rend(&tbd->stack);
+  
+  if (!(top.ptr || top_end.ptr || btm.ptr || btm_end.ptr))
   {
-    tbd_keyvalue_t* top = tbd_keyvalue_stack_top(&tbd->stack);
-    tbd_keyvalue_t* btm = tbd_keyvalue_stack_get(&tbd->stack, stack_index);
-    
-    if (btm->is_garbage)
+    return 0;
+  }
+  
+  while ((garbage_total < garbage_limit) && (top.ptr != top_end.ptr) && (btm.ptr != btm_end.ptr))
+  {    
+    if (btm.ptr->is_garbage)
     {
-      if (!top->is_garbage && (btm->heap.size >= top->heap.size))
+      if (!top.ptr->is_garbage && (btm.ptr->heap.size >= top.ptr->heap.size))
       {
-        tbd_keyvalue_copy(btm, top);
+        tbd_keyvalue_copy(btm.ptr, top.ptr);
 //        tbd_keyvalue_delete(top);
         
-        garbage_total += top->heap.size;
+        garbage_total += top.ptr->heap.size;
       
         // copy heap data
-        memcpy(btm->value.data, top->value.data, top->value.size);
-        memcpy(btm->key.str, top->key.str, top->key.size);
-
-        const size_t heap_offset = top->heap.size / sizeof(void*);      
-        tbd->heap.top -= heap_offset;
+        memcpy(btm.ptr->value.data, top.ptr->value.data, top.ptr->value.size);
+        memcpy(btm.ptr->key.str, top.ptr->key.str, top.ptr->key.size);
+      
+        tbd->heap.top -= top.ptr->heap.size;
     
         // copy stack data
-        *btm = *top;
+        *btm.ptr = *top.ptr;
         --tbd->stack.count;
       }
     }
-    ++stack_index;
+    tbd_keyvalue_stack_iterator_next(&top);
+    tbd_keyvalue_stack_reverse_iterator_next(&btm);
   }
   
   return garbage_total;
-  
 }
 
 
@@ -955,20 +1265,79 @@ size_t tbd_garbage_clean(tbd_t* tbd)
  */
 
 
-void tbd_get_stats(const tbd_t* tbd, tbd_stats_t* stats)
+void tbd_stats_get(tbd_stats_t* stats, const tbd_t* tbd)
 {
   TBD_ASSERT(tbd);
   TBD_ASSERT(stats);
+  
+  stats->tbd_address = (unsigned) tbd;
+  stats->tbd_size = tbd_size(tbd);
+  stats->tbd_size_used = tbd_size_used(tbd);
+  
+  stats->tbd_keyvalue_size = sizeof (tbd_keyvalue_t);
+  
+  stats->stack_top = (unsigned) tbd_keyvalue_stack_top(&tbd->stack);
+  stats->stack_btm = (unsigned) tbd->stack.start;
+  stats->stack_count = tbd->stack.count;
+  stats->stack_size = tbd->stack.count * sizeof(tbd_keyvalue_t);
+  
+  stats->heap_top = (unsigned) tbd->heap.top;
+  stats->heap_size = tbd->heap.size;
+ 
+  stats->garbage_front = tbd->garbage.front;
+  stats->garbage_back = tbd->garbage.back;  
+  stats->garbage_size = tbd_garbage_size(tbd);
+  stats->garbage_count = tbd_garbage_count(tbd);
 }
 
 
 
 
-void tbd_print_stats(const tbd_stats_t* stats)
+int tbd_stats_print(const tbd_stats_t* stats)
 {
   TBD_ASSERT(stats);
+  
+  int total_printed = 0;
+  
+  total_printed += puts("{");
+  total_printed += printf("\ttbd_address:\t0x%0X,\n", stats->tbd_address);
+  total_printed += printf("\ttbd_size:\t0x%0X,\n", (unsigned) stats->tbd_size);
+  total_printed += printf("\ttbd_size_used:\t0x%0X,\n", (unsigned) stats->tbd_size_used);
+  
+  total_printed += printf("\ttbd_keyvalue_size:\t0x%0X,\n", (unsigned) stats->tbd_keyvalue_size); 
+  
+  total_printed += printf("\tstack_top:\t0x%0X,\n", (unsigned) stats->stack_top);
+  total_printed += printf("\tstack_btm:\t0x%0X,\n", (unsigned) stats->stack_btm);
+  
+  total_printed += printf("\tstack_count:\t0x%0X,\n", (unsigned) stats->stack_count);
+  total_printed += printf("\tstack_size:\t0x%0X,\n", (unsigned) stats->stack_size);
+  
+  total_printed += printf("\theap_top:\t0x%0X,\n", (unsigned) stats->heap_top);  
+  total_printed += printf("\theap_size:\t0x%0X,\n", (unsigned) stats->heap_size);  
+
+  total_printed += printf("\tgarbage_front:\t0x%0X,\n", (unsigned) stats->garbage_front);  
+  total_printed += printf("\tgarbage_back:\t0x%0X,\n", (unsigned) stats->garbage_back);   
+  total_printed += printf("\tgarbage_size:\t0x%0X,\n", (unsigned) stats->garbage_size);  
+  total_printed += printf("\tgarbage_count:\t0x%0X,\n", (unsigned) stats->garbage_count);  
+
+  
+  total_printed += puts("}");
+  
+  
+  return total_printed;
 }
 
+
+
+
+int tbd_print_stats(const tbd_t* tbd)
+{
+  tbd_stats_t stats;
+  
+  tbd_stats_get(&stats, tbd);
+  
+  return tbd_stats_print(&stats);
+}
 
 
 
@@ -1066,7 +1435,7 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
   TBD_ASSERT(key);
   
   // find the element
-  struct tbd_keyvalue_struct* ptr = tbd_keyvalue_find(tbd, key);
+  const tbd_keyvalue_t* ptr = tbd_keyvalue_find_const(tbd, key);
   if (!ptr)
   {
     return 0;

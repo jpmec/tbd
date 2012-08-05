@@ -19,7 +19,7 @@
 
 
 
-static unsigned tbd_memory[256];
+static unsigned char tbd_memory[256];
 static char json_buffer[256];
 
 
@@ -86,14 +86,16 @@ static int test_tbd_create(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
 
-  /* Setup tbd_create */
+  tbd_print_stats(tbd);
+  
+  // Setup tbd_create
   struct Foo foo1 = {1, 'a'};  
   
-  /* Exercise tbd_create */
+  // Exercise tbd_create
   int tbd_create_result = tbd_create(tbd, "foo", &foo1, sizeof(struct Foo));
-  
-  /* Verify tbd_create */
   assert(TBD_NO_ERROR == tbd_create_result);
+  
+  tbd_print_stats(tbd);
   
   tbd_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_RAW, TBD_VALUE_TO_JSON_FORMAT_HEX);  
   puts(json_buffer);
@@ -106,13 +108,16 @@ static int test_tbd_create(tbd_t* tbd)
 
 static int test_tbd_read(tbd_t* tbd)
 {
-  START_TEST_TBD(tbd);
+  START_TEST_TBD(tbd);  
+  tbd_print_stats(tbd);
   
   /* Setup tbd_create */
   struct Foo foo1 = {1, 'a'};  
   int tbd_create_result = tbd_create(tbd, "foo", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR == tbd_create_result);  
-  
+
+  tbd_print_stats(tbd);
+    
   /* Setup tbd_read */
   struct Foo foo2 = {0};
   
@@ -163,12 +168,15 @@ static int test_tbd_update(tbd_t* tbd)
 
 static int test_tbd_delete(tbd_t* tbd)
 {
-  START_TEST_TBD(tbd);  
+  START_TEST_TBD(tbd);
+  
+  tbd_print_stats(tbd);
   
   struct Foo foo1 = {1, 'a'};  
   int tbd_create_result = tbd_create(tbd, "foo", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR == tbd_create_result);   
   
+  tbd_print_stats(tbd);  
   
   /* Exercise tbd_delete */
   int tbd_delete_result = tbd_delete(tbd, "foo");
@@ -176,6 +184,8 @@ static int test_tbd_delete(tbd_t* tbd)
   /* verify tbd_delete */
   assert(TBD_NO_ERROR == tbd_delete_result);
   
+  tbd_print_stats(tbd);  
+
   // attempt to read deleted object
   int tbd_read_result = tbd_read(tbd, "foo", &foo1, sizeof(struct Foo));
   assert(TBD_ERROR == tbd_read_result);  
@@ -225,37 +235,43 @@ static int test_tbd_garbage_size(tbd_t* tbd)
 static int test_tbd_garbage_pop(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
-
+  tbd_print_stats(tbd);
+  
   /* setup database with 1 element */
   struct Foo foo1 = {1, 'a'};
   
   int tbd_create_result = tbd_create(tbd, "foo1", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR ==  tbd_create_result);
+  tbd_print_stats(tbd);
   
   size_t tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 == tbd_garbage_size_result); 
   
   int tbd_delete_result = tbd_delete(tbd, "foo1");
   assert(TBD_NO_ERROR ==  tbd_delete_result);
+  tbd_print_stats(tbd);
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);  
   
   size_t tbd_garbage_pop_result = tbd_garbage_pop(tbd, 0);
   assert(0 == tbd_garbage_pop_result);
+  tbd_print_stats(tbd);
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);   
   
   tbd_garbage_pop_result = tbd_garbage_pop(tbd, tbd_garbage_size_result - 1);
   assert(0 == tbd_garbage_pop_result);
+  tbd_print_stats(tbd);
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);   
 
   tbd_garbage_pop_result = tbd_garbage_pop(tbd, tbd_garbage_size_result);
   assert(0 < tbd_garbage_pop_result);
-
+  tbd_print_stats(tbd);
+  
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 == tbd_garbage_size_result);     
   
@@ -444,7 +460,8 @@ int test_tbd(void)
   
   /* Verify tbd_init */
   assert(tbd);
-
+  tbd_print_stats(tbd);
+  
   /* Test basic operations */
   assert(0 == test_tbd_size(tbd));
   assert(0 == test_tbd_size_used(tbd));  
@@ -458,10 +475,10 @@ int test_tbd(void)
   /* Test garbage collection */
   assert(0 == test_tbd_garbage_size(tbd));
   assert(0 == test_tbd_garbage_pop(tbd));  
-  assert(0 == test_tbd_garbage_fold(tbd));
-  assert(0 == test_tbd_garbage_pack(tbd));    
-  assert(0 == test_tbd_garbage_collect(tbd));
-  assert(0 == test_tbd_garbage_clean(tbd));
+//  assert(0 == test_tbd_garbage_fold(tbd));
+//  assert(0 == test_tbd_garbage_pack(tbd));    
+//  assert(0 == test_tbd_garbage_collect(tbd));
+//  assert(0 == test_tbd_garbage_clean(tbd));
   
   /* Test JSON support */
   assert(0 == test_tbd_json(tbd));
