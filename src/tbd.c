@@ -16,6 +16,7 @@
  *    | ...                      |
  *    |-                         |
  *    | ...                      |
+ *    |                          |
  *    |-                         |
  *    | tbd top of stack         | <-- first (newest) stack element
  *    | ...                      |
@@ -265,6 +266,8 @@ static size_t tbd_keyvalue_copy(tbd_keyvalue_t* dest, const tbd_keyvalue_t* src)
 
 
 
+/** Return number of bytes of garbage for the keyvalue.
+ */
 static size_t tbd_keyvalue_garbage_size(const tbd_keyvalue_t* keyvalue)
 {
   size_t total_size = 0;
@@ -569,11 +572,39 @@ static tbd_keyvalue_stack_const_reverse_iterator_t tbd_keyvalue_stack_rend(const
 {
   TBD_ASSERT(stack);
   
-  return (tbd_keyvalue_stack_const_reverse_iterator_t) 
+  if (!stack->count)
   {
-    .ptr = tbd_keyvalue_stack_top(stack) + 1
-  };
+    return (tbd_keyvalue_stack_const_reverse_iterator_t) 
+    {
+      .ptr = stack->start
+    }; 
+  }
+  else
+  {
+    return (tbd_keyvalue_stack_const_reverse_iterator_t) 
+    {
+      .ptr = tbd_keyvalue_stack_top(stack) + 1
+    };
+  }
 }
+
+
+
+
+static bool tbd_keyvalue_stack_is_contiguous(const tbd_keyvalue_stack_t* stack)
+{
+  tbd_keyvalue_stack_const_iterator_t top = tbd_keyvalue_stack_const_begin(stack);  
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(stack);
+  
+  while (top.ptr != end.ptr)
+  {
+    // TODO check for contiguity.
+    tbd_keyvalue_stack_const_iterator_next(&top);
+  }
+  
+  return true;
+}
+
 
 
 
@@ -646,7 +677,7 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
   {
     // find the insertion point
     tbd_keyvalue_t* prev = garbage->front;
-    tbd_keyvalue_t* next = garbage->front;
+    tbd_keyvalue_t* next = garbage->front->next_garbage;
     
     while ( (next) && (tbd_keyvalue_size(next) < tbd_keyvalue_size(keyvalue)) )
     {
@@ -666,12 +697,14 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
     prev->next_garbage = keyvalue;
     keyvalue->prev_garbage = prev;
     
-    if (next != prev)
+    if (next && (next != prev))
     {
       next->prev_garbage = keyvalue_last;
       keyvalue_last->next_garbage = next;
     }
   }
+  
+  keyvalue->is_garbage = true;
 }
 
 
@@ -682,34 +715,31 @@ static void tbd_garbage_list_delete(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
   TBD_ASSERT(garbage);
   TBD_ASSERT(keyvalue);
   
-  if (garbage->front)
-  {
-    return;
-  }
-  
   if (garbage->front == keyvalue)
   {
     garbage->front = keyvalue->next_garbage;
-    keyvalue->prev_garbage = NULL;
-    return;
   }
   
-  tbd_keyvalue_t* prev = garbage->front;  
-  tbd_keyvalue_t* next = prev->next_garbage;
-  
-  while ((next) && (next != keyvalue))
+  if (garbage->back == keyvalue)
   {
-    prev = next;
-    next = next->next_garbage;
+    garbage->back = keyvalue->prev_garbage;
   }
   
-  if (next != keyvalue)
+  // unlink keyvalue from garbage list
+  tbd_keyvalue_t* prev = keyvalue->prev_garbage;  
+  tbd_keyvalue_t* next = keyvalue->next_garbage;
+  
+  if (prev)
   {
-    return;
+    prev->next_garbage = keyvalue->next_garbage;
   }
   
-  prev->next_garbage = keyvalue->next_garbage;
-  next->prev_garbage = keyvalue->prev_garbage;
+  if (next)
+  {
+    next->prev_garbage = keyvalue->prev_garbage;
+  }
+  
+  keyvalue->is_garbage = false;
 }
 
 
@@ -754,38 +784,65 @@ static size_t tbd_keyvalue_hunk_size(const tbd_t* tbd, size_t key_size, size_t v
 
 /** Create a new keyvalue with the given sizes.
  */
-static struct tbd_keyvalue_struct* tbd_create_keyvalue(tbd_t* tbd, size_t key_size, size_t value_size)
+static tbd_keyvalue_t* tbd_create_keyvalue(tbd_t* tbd, size_t key_size, size_t value_size)
 {
   TBD_ASSERT(tbd);
 
-  const size_t hunk_size = tbd_keyvalue_hunk_size(tbd, key_size, value_size);  
+  const size_t hunk_size = tbd_keyvalue_hunk_size(tbd, key_size, value_size);
   
-  // check there is enough room to add elements of that size
-  tbd_keyvalue_t* stack_top = tbd_keyvalue_stack_push(&tbd->stack);
-  unsigned char* heap_top = tbd_heap_push(&tbd->heap, hunk_size);
+  tbd_keyvalue_t* keyvalue = NULL;
   
-  if (heap_top < (unsigned char*) stack_top)
+  // try to find a garbage element with same heap size
+  tbd_keyvalue_stack_reverse_iterator_t btm = tbd_keyvalue_stack_rbegin(&tbd->stack);
+  tbd_keyvalue_stack_const_reverse_iterator_t btm_end = tbd_keyvalue_stack_rend(&tbd->stack);
+  
+  if (btm.ptr && btm_end.ptr)
   {
-    tbd_keyvalue_stack_pop(&tbd->stack);
-    tbd_heap_pop(&tbd->heap, hunk_size);
-    return 0;
+    while (btm.ptr != btm_end.ptr)
+    {
+      if (btm.ptr->is_garbage && (btm.ptr->heap.size == hunk_size))
+      {
+        tbd_garbage_list_delete(&tbd->garbage, btm.ptr);
+      
+        keyvalue = btm.ptr;
+        break;
+      }
+    
+      tbd_keyvalue_stack_reverse_iterator_next(&btm);
+    }
   }
+  
+  // if no suitable garbage was found, then allocate from heap
+  if (!keyvalue)
+  {
+    // check there is enough room to add elements of that size
+    keyvalue = tbd_keyvalue_stack_push(&tbd->stack);
+    unsigned char* heap_top = tbd_heap_push(&tbd->heap, hunk_size);
+  
+    if (heap_top < (unsigned char*) keyvalue)
+    {
+      tbd_keyvalue_stack_pop(&tbd->stack);
+      tbd_heap_pop(&tbd->heap, hunk_size);
+      return NULL;
+    }
 
-  stack_top->heap.top = heap_top;  
-  stack_top->heap.size = hunk_size;
+    keyvalue->heap.top = heap_top;  
+    keyvalue->heap.size = hunk_size;  
+
+    // initialize garbage list node
+    keyvalue->is_garbage = false;
+    keyvalue->next_garbage = NULL;
+    keyvalue->prev_garbage = NULL;  
+  }
   
-  stack_top->value.data = heap_top;
-  stack_top->value.size = value_size;
+  // set value and key pointers
+  keyvalue->value.data = keyvalue->heap.top;
+  keyvalue->value.size = value_size;
   
-  stack_top->key.str = (char*) (heap_top + value_size);
-  stack_top->key.size = key_size;
+  keyvalue->key.str = (char*) (keyvalue->heap.top + value_size);
+  keyvalue->key.size = key_size;
   
-  // initialize garbage list node
-  stack_top->is_garbage = false;
-  stack_top->next_garbage = NULL;
-  stack_top->prev_garbage = NULL;
-  
-  return stack_top;
+  return keyvalue;
 }
 
 
@@ -880,7 +937,7 @@ int tbd_create(tbd_t* tbd, const char* key, const void* value, size_t value_size
   
   if (!keyvalue)
   {
-    return 0;
+    return TBD_ERROR;
   }
   
   // copy the data into the newly allocated memory
@@ -947,7 +1004,6 @@ int tbd_delete(tbd_t* tbd, const char* key)
     return TBD_NO_ERROR; // no error if it did not exist
   }  
   
-  ptr->is_garbage = true;
   tbd_garbage_list_insert(&tbd->garbage, ptr);
   
   return TBD_NO_ERROR;
@@ -1134,7 +1190,6 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
   }
   
   size_t garbage_total = 0;
-  size_t stack_index = 0; 
 
   tbd_keyvalue_stack_iterator_t top = tbd_keyvalue_stack_begin(&tbd->stack);
   tbd_keyvalue_stack_const_iterator_t top_end = tbd_keyvalue_stack_end(&tbd->stack);
@@ -1148,27 +1203,60 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
   }
   
   while ((garbage_total < garbage_limit) && (top.ptr != top_end.ptr) && (btm.ptr != btm_end.ptr))
-  {    
-    if (btm.ptr->is_garbage)
+  { 
+    if (top.ptr->is_garbage)
     {
-      if (!top.ptr->is_garbage && (btm.ptr->heap.size >= top.ptr->heap.size))
-      {
-        tbd_keyvalue_copy(btm.ptr, top.ptr);
-//        tbd_keyvalue_delete(top);
-        
-        garbage_total += top.ptr->heap.size;
-      
-        // copy heap data
-        memcpy(btm.ptr->value.data, top.ptr->value.data, top.ptr->value.size);
-        memcpy(btm.ptr->key.str, top.ptr->key.str, top.ptr->key.size);
-      
-        tbd->heap.top -= top.ptr->heap.size;
-    
-        // copy stack data
-        *btm.ptr = *top.ptr;
-        --tbd->stack.count;
-      }
+      tbd_keyvalue_stack_iterator_next(&top);
+      continue;  
     }
+    
+    if (!btm.ptr->is_garbage)
+    {
+      tbd_keyvalue_stack_reverse_iterator_next(&btm);
+      continue;
+    }
+    
+    tbd_keyvalue_stack_iterator_t temp_top = top;
+    
+    while (temp_top.ptr != top_end.ptr)
+    {
+      if (temp_top.ptr->is_garbage)
+      {
+        tbd_keyvalue_stack_iterator_next(&temp_top);
+        continue;  
+      }      
+      
+      size_t garbage_size = tbd_keyvalue_size(temp_top.ptr);
+      
+      if (garbage_total + garbage_size > garbage_limit)
+      {
+        tbd_keyvalue_stack_iterator_next(&temp_top);
+        continue;
+      }
+      
+      if (btm.ptr->heap.size == temp_top.ptr->heap.size)
+      {
+        garbage_total += tbd_keyvalue_copy(btm.ptr, temp_top.ptr);
+        
+        btm.ptr->is_garbage = false;
+        temp_top.ptr->is_garbage = true;
+        temp_top.ptr->next_garbage = btm.ptr->next_garbage;
+        temp_top.ptr->prev_garbage = btm.ptr->prev_garbage;  
+        
+        if (tbd->garbage.front == btm.ptr)
+        {
+          tbd->garbage.front = temp_top.ptr;
+        }
+        
+        if (tbd->garbage.back == btm.ptr)
+        {
+          tbd->garbage.back = temp_top.ptr;
+        }        
+      }
+      
+      tbd_keyvalue_stack_iterator_next(&temp_top);      
+    }
+    
     tbd_keyvalue_stack_iterator_next(&top);
     tbd_keyvalue_stack_reverse_iterator_next(&btm);
   }
@@ -1188,7 +1276,38 @@ size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
     return 0;
   }
   
-  return 0;
+  int garbage_total = 0;
+  
+  tbd_keyvalue_stack_reverse_iterator_t dest = tbd_keyvalue_stack_rbegin(&tbd->stack);
+  tbd_keyvalue_stack_const_reverse_iterator_t end = tbd_keyvalue_stack_rend(&tbd->stack);
+    
+  if (!dest.ptr || !end.ptr)
+  {
+    return 0;
+  }
+
+  tbd_keyvalue_stack_reverse_iterator_t src = dest;  
+  tbd_keyvalue_stack_reverse_iterator_next(&src);
+  
+  while(src.ptr != end.ptr)
+  {
+    if (dest.ptr->is_garbage && !src.ptr->is_garbage)
+    {
+      const size_t dest_size = dest.ptr->heap.size;
+      
+      tbd_keyvalue_copy(dest.ptr, src.ptr);
+      
+      src.ptr->heap.size = dest_size;
+      
+      dest.ptr->is_garbage = false;
+      src.ptr->is_garbage = true;
+    }
+    
+    tbd_keyvalue_stack_reverse_iterator_next(&dest);    
+    tbd_keyvalue_stack_reverse_iterator_next(&src);
+  }
+  
+  return garbage_total;
 }
 
 
@@ -1284,8 +1403,8 @@ void tbd_stats_get(tbd_stats_t* stats, const tbd_t* tbd)
   stats->heap_top = (unsigned) tbd->heap.top;
   stats->heap_size = tbd->heap.size;
  
-  stats->garbage_front = tbd->garbage.front;
-  stats->garbage_back = tbd->garbage.back;  
+  stats->garbage_front = (unsigned) tbd->garbage.front;
+  stats->garbage_back = (unsigned) tbd->garbage.back;  
   stats->garbage_size = tbd_garbage_size(tbd);
   stats->garbage_count = tbd_garbage_count(tbd);
 }

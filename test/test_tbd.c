@@ -15,11 +15,12 @@
 #define START_TEST_TBD(_tbd_ptr_) \
   puts(__FUNCTION__); \
   assert(_tbd_ptr_); \
-  tbd_empty(_tbd_ptr_);
+  tbd_empty(_tbd_ptr_); \
+  tbd_print_stats(_tbd_ptr_);
 
 
 
-static unsigned char tbd_memory[256];
+static unsigned char tbd_memory[1024];
 static char json_buffer[256];
 
 
@@ -85,8 +86,6 @@ static int test_tbd_size_used(tbd_t* tbd)
 static int test_tbd_create(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
-
-  tbd_print_stats(tbd);
   
   // Setup tbd_create
   struct Foo foo1 = {1, 'a'};  
@@ -109,7 +108,6 @@ static int test_tbd_create(tbd_t* tbd)
 static int test_tbd_read(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
-  tbd_print_stats(tbd);
   
   /* Setup tbd_create */
   struct Foo foo1 = {1, 'a'};  
@@ -170,8 +168,6 @@ static int test_tbd_delete(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);
   
-  tbd_print_stats(tbd);
-  
   struct Foo foo1 = {1, 'a'};  
   int tbd_create_result = tbd_create(tbd, "foo", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR == tbd_create_result);   
@@ -200,31 +196,42 @@ static int test_tbd_garbage_size(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
 
-  /* test with clear database */
+  // test with clear database
   size_t tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 == tbd_garbage_size_result);  
   
   
-  /* setup database with 1 element */
+  // setup database with 1 element
   struct Foo foo1 = {1, 'a'};
   
   int tbd_create_result = tbd_create(tbd, "foo1", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_print_stats(tbd);
   
   int tbd_delete_result = tbd_delete(tbd, "foo1");
   assert(TBD_NO_ERROR ==  tbd_delete_result);
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);
+
+  tbd_print_stats(tbd);  
   
-  tbd_create_result = tbd_create(tbd, "foo2", &foo1, sizeof(struct Foo));
+  // add another element
+  struct Foo foo2 = {2, 'b'};  
+  
+  tbd_create_result = tbd_create(tbd, "foo2", &foo2, sizeof(struct Foo));
   assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_print_stats(tbd);  
   
   tbd_delete_result = tbd_delete(tbd, "foo2");
   assert(TBD_NO_ERROR ==  tbd_delete_result);
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);
+  
+  tbd_print_stats(tbd);  
   
   return 0;
 }
@@ -234,8 +241,7 @@ static int test_tbd_garbage_size(tbd_t* tbd)
 
 static int test_tbd_garbage_pop(tbd_t* tbd)
 {
-  START_TEST_TBD(tbd);  
-  tbd_print_stats(tbd);
+  START_TEST_TBD(tbd);
   
   /* setup database with 1 element */
   struct Foo foo1 = {1, 'a'};
@@ -285,25 +291,50 @@ static int test_tbd_garbage_fold(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
   
-  /* setup database with 1 element */
+  // setup database elements
   struct Foo foo1 = {1, 'a'};
   struct Foo foo2 = {2, 'b'};
   struct Foo foo3 = {3, 'c'};
+  struct Foo foo4 = {4, 'd'};
+
+  struct Bar bar1 = {'w'};  
+  struct Bar bar2 = {'x'};
+  struct Bar bar3 = {'y'};
+  struct Bar bar4 = {'z'};  
   
   int tbd_create_result = tbd_create(tbd, "foo1", &foo1, sizeof(struct Foo));
   assert(TBD_NO_ERROR ==  tbd_create_result);
 
+  tbd_create_result = tbd_create(tbd, "bar1", &bar1, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);  
+  
   tbd_create_result = tbd_create(tbd, "foo2", &foo2, sizeof(struct Foo));
   assert(TBD_NO_ERROR ==  tbd_create_result);  
+
+  tbd_create_result = tbd_create(tbd, "bar2", &bar2, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);    
   
   tbd_create_result = tbd_create(tbd, "foo3", &foo3, sizeof(struct Foo));
-  assert(TBD_NO_ERROR ==  tbd_create_result);  
+  assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_create_result = tbd_create(tbd, "bar3", &bar3, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);    
+
+  tbd_create_result = tbd_create(tbd, "foo4", &foo4, sizeof(struct Foo));
+  assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_create_result = tbd_create(tbd, "bar4", &bar4, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);    
   
   size_t tbd_garbage_size_result = tbd_garbage_size(tbd);
-  assert(0 == tbd_garbage_size_result); 
+  assert(0 == tbd_garbage_size_result);
   
-  int tbd_delete_result = tbd_delete(tbd, "foo1");
+  tbd_print_stats(tbd);
+  
+  int tbd_delete_result = tbd_delete(tbd, "foo2");
   assert(TBD_NO_ERROR ==  tbd_delete_result);
+  
+  tbd_print_stats(tbd);  
   
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 < tbd_garbage_size_result);  
@@ -323,8 +354,7 @@ static int test_tbd_garbage_fold(tbd_t* tbd)
   tbd_garbage_fold_result = tbd_garbage_fold(tbd, tbd_garbage_size_result);
   assert(0 < tbd_garbage_fold_result);
   
-  tbd_garbage_size_result = tbd_garbage_size(tbd);
-  assert(0 == tbd_garbage_size_result);     
+  tbd_print_stats(tbd);
   
   return 0;
 }
@@ -335,7 +365,53 @@ static int test_tbd_garbage_fold(tbd_t* tbd)
 static int test_tbd_garbage_pack(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
-   
+
+  // setup database element
+  struct Foo foo1 = {1, 'a'};
+  struct Foo foo2 = {2, 'b'};
+  struct Foo foo3 = {3, 'c'};
+  struct Foo foo4 = {4, 'd'};
+  
+  struct Bar bar1 = {'w'};  
+  struct Bar bar2 = {'x'};
+  struct Bar bar3 = {'y'};
+  struct Bar bar4 = {'z'};  
+  
+  int tbd_create_result = tbd_create(tbd, "foo1", &foo1, sizeof(struct Foo));
+  assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_create_result = tbd_create(tbd, "bar1", &bar1, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);  
+  
+  tbd_create_result = tbd_create(tbd, "foo2", &foo2, sizeof(struct Foo));
+  assert(TBD_NO_ERROR ==  tbd_create_result);  
+  
+  tbd_create_result = tbd_create(tbd, "bar2", &bar2, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);    
+  
+  tbd_create_result = tbd_create(tbd, "foo3", &foo3, sizeof(struct Foo));
+  assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_create_result = tbd_create(tbd, "bar3", &bar3, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);    
+  
+  tbd_create_result = tbd_create(tbd, "foo4", &foo4, sizeof(struct Foo));
+  assert(TBD_NO_ERROR ==  tbd_create_result);
+  
+  tbd_create_result = tbd_create(tbd, "bar4", &bar4, sizeof(struct Bar));
+  assert(TBD_NO_ERROR ==  tbd_create_result);      
+  
+  int tbd_delete_result = tbd_delete(tbd, "foo2");
+  assert(TBD_NO_ERROR ==  tbd_delete_result);
+  
+  size_t tbd_garbage_size_result = tbd_garbage_size(tbd);
+  assert(0 < tbd_garbage_size_result);     
+  
+  tbd_print_stats(tbd);
+  
+  size_t tbd_garbage_pack_result = tbd_garbage_pack(tbd, tbd_garbage_size_result);
+  assert(0 < tbd_garbage_pack_result);
+  
   return 0;
 }
 
@@ -475,7 +551,7 @@ int test_tbd(void)
   /* Test garbage collection */
   assert(0 == test_tbd_garbage_size(tbd));
   assert(0 == test_tbd_garbage_pop(tbd));  
-//  assert(0 == test_tbd_garbage_fold(tbd));
+  assert(0 == test_tbd_garbage_fold(tbd));
 //  assert(0 == test_tbd_garbage_pack(tbd));    
 //  assert(0 == test_tbd_garbage_collect(tbd));
 //  assert(0 == test_tbd_garbage_clean(tbd));
