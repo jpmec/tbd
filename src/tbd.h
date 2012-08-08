@@ -14,6 +14,9 @@
  *
  * Garbage collection is used to reclaim key-value pairs that are no longer used.
  *
+ * Author: Joshua Petitt
+ * Available at: https://github.com/jpmec/tbd
+ *
  */
 
 
@@ -74,6 +77,11 @@ void tbd_empty(tbd_t* tbd);
 /** Return total allocated size in bytes for the tbd.
  */
 size_t tbd_size(const tbd_t* tbd);
+
+
+/** Return number of bytes used by header information.
+ */
+size_t tbd_head_size(const tbd_t* tbd);
 
 
 /** Return number of bytes used by the tbd.
@@ -179,6 +187,7 @@ typedef struct tbd_stats_struct
   unsigned tbd_address;
   size_t   tbd_size;
   size_t   tbd_size_used;
+  size_t   tbd_head_size;
   
   size_t   tbd_keyvalue_size;    ///< Size of a tbd_keyvalue_t element in bytes
   

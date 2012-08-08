@@ -2,7 +2,13 @@
  *  
  *  Tiny Basic Datastore.
  *
+ *  Author: Joshua Petitt
+ *  Available at: https://github.com/jpmec/tbd 
+ *
+ *
  *  Implementation of tbd.  All tbd configuration and functionality is placed in this file.
+ *
+ *
  *
  *
  *          TBD Memory Model
@@ -30,7 +36,7 @@
  *    | tbd bottom of heap       | <-- oldest heap data
  *    +--------------------------+
  *    |                          | <-- tbd start address + tbd size
- * 
+ *
  */
 
 
@@ -76,8 +82,8 @@
  */
 typedef struct tbd_key_struct
 {
-  char* str;       /**< Pointer to key string data. */
-  size_t size;     /**< Size in bytes of key string data. */
+  char* str;       ///< Pointer to key string data. */
+  size_t size;     ///< Size in bytes of key string data. */
   
 } tbd_key_t;
 
@@ -258,7 +264,8 @@ static size_t tbd_keyvalue_copy(tbd_keyvalue_t* dest, const tbd_keyvalue_t* src)
   memcpy(dest->key.str, src->key.str, src->key.size);
   
   // copy stack data
-  *dest = *src;
+  dest->key = src->key;
+  dest->value = src->value;
   
   return tbd_keyvalue_size(src);
 }
@@ -907,11 +914,21 @@ size_t tbd_size(const tbd_t* tbd)
 
 
 
+size_t tbd_head_size(const tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  return sizeof(tbd_t);
+}
+
+
+
+
 size_t tbd_size_used(const tbd_t* tbd)
 {
   TBD_ASSERT(tbd);
   
-  return sizeof(tbd_t) + tbd->stack.count * sizeof(tbd_keyvalue_t) + tbd->heap.size;
+  return tbd_head_size(tbd) + tbd->stack.count * sizeof(tbd_keyvalue_t) + tbd->heap.size;
 }
 
 
@@ -1267,6 +1284,10 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
 
 
 
+/** Pack heap elements.
+ *  Process adjacent elements.  If lower element is garbage and upper element is used, 
+ *  then copy upper element and align with bottom of lower element
+ */
 size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
@@ -1276,10 +1297,15 @@ size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
     return 0;
   }
   
+  if (!tbd->stack.count)
+  {
+    return 0;
+  }
+  
   int garbage_total = 0;
   
   tbd_keyvalue_stack_reverse_iterator_t dest = tbd_keyvalue_stack_rbegin(&tbd->stack);
-  tbd_keyvalue_stack_const_reverse_iterator_t end = tbd_keyvalue_stack_rend(&tbd->stack);
+  const tbd_keyvalue_stack_const_reverse_iterator_t end = tbd_keyvalue_stack_rend(&tbd->stack);
     
   if (!dest.ptr || !end.ptr)
   {
@@ -1293,14 +1319,20 @@ size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
   {
     if (dest.ptr->is_garbage && !src.ptr->is_garbage)
     {
+      const size_t src_size = src.ptr->heap.size;
       const size_t dest_size = dest.ptr->heap.size;
+      
+      // TODO handle situation where src and dest overlap
+      
+      dest.ptr->heap.top = dest.ptr->heap.top + dest.ptr->heap.size - src_size;
+      dest.ptr->heap.size = src_size;
       
       tbd_keyvalue_copy(dest.ptr, src.ptr);
       
       src.ptr->heap.size = dest_size;
       
-      dest.ptr->is_garbage = false;
-      src.ptr->is_garbage = true;
+      tbd_garbage_list_delete(&tbd->garbage, dest.ptr);
+      tbd_garbage_list_insert(&tbd->garbage, src.ptr);      
     }
     
     tbd_keyvalue_stack_reverse_iterator_next(&dest);    
@@ -1392,6 +1424,7 @@ void tbd_stats_get(tbd_stats_t* stats, const tbd_t* tbd)
   stats->tbd_address = (unsigned) tbd;
   stats->tbd_size = tbd_size(tbd);
   stats->tbd_size_used = tbd_size_used(tbd);
+  stats->tbd_head_size = tbd_head_size(tbd);
   
   stats->tbd_keyvalue_size = sizeof (tbd_keyvalue_t);
   
@@ -1422,6 +1455,7 @@ int tbd_stats_print(const tbd_stats_t* stats)
   total_printed += printf("\ttbd_address:\t0x%0X,\n", stats->tbd_address);
   total_printed += printf("\ttbd_size:\t0x%0X,\n", (unsigned) stats->tbd_size);
   total_printed += printf("\ttbd_size_used:\t0x%0X,\n", (unsigned) stats->tbd_size_used);
+  total_printed += printf("\ttbd_head_size:\t0x%0X,\n", (unsigned) stats->tbd_head_size);
   
   total_printed += printf("\ttbd_keyvalue_size:\t0x%0X,\n", (unsigned) stats->tbd_keyvalue_size); 
   
