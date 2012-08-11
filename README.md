@@ -1,4 +1,7 @@
 tbd
 ===
 
-Tiny Bare-metal Datastore
+Tiny Basic Datastore.
+
+see tbd.h for more information.
+

@@ -29,6 +29,13 @@
 
 
 
+/** Maximum number of characters for a tbd key.  Includes null terminator.
+ */
+#define TBD_MAX_KEY_LENGTH    (8u)
+
+
+
+
 /* Forward declarations for opaque structures. */
 struct tbd_struct;
 
@@ -38,9 +45,15 @@ typedef struct tbd_struct tbd_t;
 
 
 
-/* Error codes */
-#define TBD_NO_ERROR    (0)
-#define TBD_ERROR       (-1)
+
+/* Error codes
+ * All error codes are less than 0.
+ */
+#define TBD_NO_ERROR             (0)
+#define TBD_ERROR               (-1)
+#define TBD_ERROR_KEY_NOT_FOUND (-2)
+#define TBD_ERROR_KEY_EXISTS    (-3)
+#define TBD_ERROR_BAD_SIZE      (-4)
 
 
 
@@ -62,6 +75,17 @@ typedef struct tbd_init_struct
  *  Returns opaque pointer to tbd_struct.
  */
 tbd_t* tbd_init(const tbd_init_t* init);
+
+
+/** Get the tbd library version.
+ */
+int tbd_version(void);
+
+
+/** Returns 1 if the value represents a tbd error code,
+ *  Returns 0 otherwise.
+ */
+int tbd_is_error(int value);
 
 
 /** Clear a tdb, all data including stack and heap locations will be lost.
@@ -89,31 +113,44 @@ size_t tbd_head_size(const tbd_t* tbd);
 size_t tbd_size_used(const tbd_t* tbd);
 
 
+/** Return number of keyvalues stored in the tbd.
+ */
+size_t tbd_count(const tbd_t* tbd);
 
 
-/* Basic CRUD operations
+
+
+/* 
+ * Basic CRUD operations
  */
 
 
 /** Copy an element into to the data store.
+ * 
+ *  Returns TBD_ERROR_KEY_EXISTS if a key:value pair already exists in the data store.
  *  Returns TBD_NO_ERROR if successful, 
  */
 int tbd_create(tbd_t* tbd, const char* key, const void* value, size_t value_size);
 
 
 /** Get an element from the data store.
+ *  Returns TBD_ERROR_KEY_NOT_FOUND if key does not exist.
  *  Returns TBD_NO_ERROR if successful.
  */
 int tbd_read(tbd_t* tbd, const char* key, void* value, size_t value_size);
 
 
 /** Update an existing element in the data store.
+ *  
+ *  Returns TBD_ERROR_BAD_SIZE if value_size does not match size of element in data store.
  *  Returns TBD_NO_ERROR if successful.
  */
 int tbd_update(tbd_t* tbd, const char* key, const void* value, size_t value_size);
 
 
 /** Delete an existing element in the data store.
+ *
+ *  Returns TBD_NO_ERROR if key does not exist.
  *  Returns TBD_NO_ERROR if successful.
  */
 int tbd_delete(tbd_t* tbd, const char* key);
@@ -121,11 +158,22 @@ int tbd_delete(tbd_t* tbd, const char* key);
 
 
 
-
-
-
-/* Memory Management
+/* 
+ * Advanced CRUD operations 
  */
+
+
+/** Get the size of a value from the data store.
+ */
+size_t tbd_read_size(tbd_t* tbd, const char* key);
+
+
+
+
+/* 
+ * Memory Management
+ */
+
 
 /** Return number of bytes of garbage.
  */

@@ -16,16 +16,21 @@
 
 
 
+#include <stddef.h>
+
+
+
+
 struct tbds_start_params
 {
-  
+  size_t tbd_size;
 };
 
 
 
 /** Start the server.
  */
-void tbds_start(struct tbds_start_params*);
+void tbds_start(const struct tbds_start_params*);
 
 
 

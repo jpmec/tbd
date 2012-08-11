@@ -50,6 +50,11 @@
 
 
 
+#define TBD_VERSION    (0)
+
+
+
+
 /* Optional support
  * Comment out and functionality that shouldn't be inluded in the library.
  */
@@ -59,17 +64,19 @@
 
 #if defined(TBD_INCLUDE_ASSERT)
   #include <assert.h>
+
+  #define TBD_ASSERT(_arg_)    assert(_arg_)
+
+#else
+
+  #define TBD_ASSERT(_arg_)
+
 #endif
 
 
 #if defined(TBD_INCLUDE_STDIO)
   #include <stdio.h>
 #endif
-
-
-
-
-#define TBD_ASSERT(_arg_)    assert(_arg_)
 
 
 
@@ -277,6 +284,8 @@ static size_t tbd_keyvalue_copy(tbd_keyvalue_t* dest, const tbd_keyvalue_t* src)
  */
 static size_t tbd_keyvalue_garbage_size(const tbd_keyvalue_t* keyvalue)
 {
+  TBD_ASSERT(keyvalue);
+  
   size_t total_size = 0;
   
   while(keyvalue)
@@ -310,6 +319,8 @@ typedef struct tbd_keyvalue_stack_iterator_struct
  */
 static tbd_keyvalue_t* tbd_keyvalue_stack_iterator_next(tbd_keyvalue_stack_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   --self->ptr;
   return self->ptr;
 }
@@ -321,6 +332,8 @@ static tbd_keyvalue_t* tbd_keyvalue_stack_iterator_next(tbd_keyvalue_stack_itera
  */
 static tbd_keyvalue_t* tbd_keyvalue_stack_iterator_prev(tbd_keyvalue_stack_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   ++self->ptr;
   return self->ptr;
 }
@@ -343,6 +356,8 @@ typedef struct tbd_keyvalue_stack_reverse_iterator_struct
  */
 static tbd_keyvalue_t* tbd_keyvalue_stack_reverse_iterator_next(tbd_keyvalue_stack_reverse_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   ++self->ptr;
   return self->ptr;
 }
@@ -354,6 +369,8 @@ static tbd_keyvalue_t* tbd_keyvalue_stack_reverse_iterator_next(tbd_keyvalue_sta
  */
 static tbd_keyvalue_t* tbd_keyvalue_stack_reverse_iterator_prev(tbd_keyvalue_stack_reverse_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   --self->ptr;
   return self->ptr;
 }
@@ -378,6 +395,8 @@ typedef struct tbd_keyvalue_stack_const_iterator_struct
  */
 static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_next(tbd_keyvalue_stack_const_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   --self->ptr;
   return self->ptr;
 }
@@ -389,6 +408,8 @@ static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_next(tbd_keyvalue
  */
 static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_prev(tbd_keyvalue_stack_const_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   ++self->ptr;
   return self->ptr;
 }
@@ -411,6 +432,8 @@ typedef struct tbd_keyvalue_stack_const_reverse_iterator_struct
  */
 static const tbd_keyvalue_t* tbd_keyvalue_stack_const_reverse_iterator_next(tbd_keyvalue_stack_const_reverse_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   ++self->ptr;
   return self->ptr;
 }
@@ -422,6 +445,8 @@ static const tbd_keyvalue_t* tbd_keyvalue_stack_const_reverse_iterator_next(tbd_
  */
 static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_reverse_prev(tbd_keyvalue_stack_const_reverse_iterator_t* self)
 {
+  TBD_ASSERT(self);
+  
   --self->ptr;
   return self->ptr;
 }
@@ -600,6 +625,8 @@ static tbd_keyvalue_stack_const_reverse_iterator_t tbd_keyvalue_stack_rend(const
 
 static bool tbd_keyvalue_stack_is_contiguous(const tbd_keyvalue_stack_t* stack)
 {
+  TBD_ASSERT(stack);
+  
   tbd_keyvalue_stack_const_iterator_t top = tbd_keyvalue_stack_const_begin(stack);  
   tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(stack);
   
@@ -769,6 +796,8 @@ struct tbd_struct
   size_t size;         ///< Total size in bytes of the allocated datastore in bytes.
   size_t hunk_size;    ///< Hunk size for the datastore, this is the minimum size that is allocated from the heap.
   
+  tbd_keyvalue_t* last_found;    ///< Pointer to last keyvalue that was found using tbd_keyvalue_find.
+  
   tbd_garbage_list_t garbage;    ///< The garbage list.
   tbd_keyvalue_stack_t stack;    ///< The keyvalue stack.
   tbd_heap_t heap;               ///< The data heap.
@@ -855,6 +884,19 @@ static tbd_keyvalue_t* tbd_create_keyvalue(tbd_t* tbd, size_t key_size, size_t v
 
 
 
+/** Key comparision
+ */
+static int tbd_keyvalue_keycmp(tbd_keyvalue_t* keyvalue, const char* key)
+{
+  TBD_ASSERT(keyvalue);
+  TBD_ASSERT(key);
+  
+  return strcmp(keyvalue->key.str, key);
+}
+
+
+
+
 /** Find a keyvalue struct with a given key.
  *  Returns NULL if key was not found.
  */
@@ -880,8 +922,9 @@ static tbd_keyvalue_t* tbd_keyvalue_find(tbd_t* tbd, const char* key)
   
   while (iter.ptr != end.ptr)
   {
-    if (!iter.ptr->is_garbage && (strcmp(key, iter.ptr->key.str) == 0))
+    if (!iter.ptr->is_garbage && (tbd_keyvalue_keycmp(iter.ptr, key) == 0))
     {
+      tbd->last_found = iter.ptr;
       return iter.ptr;
     }
     
@@ -901,6 +944,21 @@ static const tbd_keyvalue_t* tbd_keyvalue_find_const(const tbd_t* tbd, const cha
   return (const tbd_keyvalue_t*) tbd_keyvalue_find((tbd_t*) tbd, key);
 }
 
+
+
+
+int tbd_version(void)
+{
+  return TBD_VERSION;
+}
+
+
+
+int tbd_is_error(int value)
+{
+  // all error codes are less than 0
+  return value < 0;
+}
 
 
 
@@ -934,6 +992,16 @@ size_t tbd_size_used(const tbd_t* tbd)
 
 
 
+size_t tbd_count(const tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  return tbd->stack.count;
+}
+
+
+
+
 int tbd_create(tbd_t* tbd, const char* key, const void* value, size_t value_size)
 {
   TBD_ASSERT(tbd);
@@ -945,7 +1013,7 @@ int tbd_create(tbd_t* tbd, const char* key, const void* value, size_t value_size
   // check that an element with given key does not already exist
   if (tbd_keyvalue_find(tbd, key))
   {
-    return 0;
+    return TBD_ERROR_KEY_EXISTS;
   }
   
   const size_t key_size = strlen(key) + 1;
@@ -969,11 +1037,16 @@ int tbd_create(tbd_t* tbd, const char* key, const void* value, size_t value_size
 
 int tbd_read(tbd_t* tbd, const char* key, void* value, size_t value_size)
 {
+  TBD_ASSERT(tbd);
+  TBD_ASSERT(key);
+  TBD_ASSERT(value);
+  TBD_ASSERT(value_size);
+  
   // find the element
   struct tbd_keyvalue_struct* ptr = tbd_keyvalue_find(tbd, key);
   if (!ptr)
   {
-    return TBD_ERROR;
+    return TBD_ERROR_KEY_NOT_FOUND;
   }
   
   // compute minimum copy size, truncate to value_size
@@ -990,11 +1063,21 @@ int tbd_read(tbd_t* tbd, const char* key, void* value, size_t value_size)
 
 int tbd_update(tbd_t* tbd, const char* key, const void* value, size_t value_size)
 {
+  TBD_ASSERT(tbd);
+  TBD_ASSERT(key);
+  TBD_ASSERT(value);
+  TBD_ASSERT(value_size);
+  
   // find the element
   struct tbd_keyvalue_struct* ptr = tbd_keyvalue_find(tbd, key);
   if (!ptr)
   {
-    return TBD_ERROR;
+    return TBD_ERROR_KEY_NOT_FOUND;
+  }
+  
+  if (value_size != ptr->value.size)
+  {
+    return TBD_ERROR_BAD_SIZE;
   }
   
   // compute minimum copy size, truncate to value_size
@@ -1024,6 +1107,24 @@ int tbd_delete(tbd_t* tbd, const char* key)
   tbd_garbage_list_insert(&tbd->garbage, ptr);
   
   return TBD_NO_ERROR;
+}
+
+
+
+
+size_t tbd_read_size(tbd_t* tbd, const char* key)
+{
+  TBD_ASSERT(tbd);
+  TBD_ASSERT(key);
+  
+  // find the element
+  struct tbd_keyvalue_struct* ptr = tbd_keyvalue_find(tbd, key);
+  if (!ptr)
+  {
+    return 0;
+  }
+  
+  return ptr->value.size;
 }
 
 
@@ -1109,6 +1210,8 @@ tbd_t* tbd_init(const tbd_init_t* init)
  */
 size_t tbd_garbage_size(const tbd_t* tbd)
 {
+  TBD_ASSERT(tbd);
+  
   size_t result = 0;
   
   tbd_keyvalue_t* ptr = tbd->garbage.front;
@@ -1128,6 +1231,8 @@ size_t tbd_garbage_size(const tbd_t* tbd)
  */
 size_t tbd_garbage_count(const tbd_t* tbd)
 {
+  TBD_ASSERT(tbd);  
+  
   size_t result = 0;
 
   tbd_keyvalue_t* ptr = tbd->garbage.front;
@@ -1451,6 +1556,9 @@ int tbd_stats_print(const tbd_stats_t* stats)
   
   int total_printed = 0;
   
+  
+#ifdef TBD_INCLUDE_STDIO
+  
   total_printed += puts("{");
   total_printed += printf("\ttbd_address:\t0x%0X,\n", stats->tbd_address);
   total_printed += printf("\ttbd_size:\t0x%0X,\n", (unsigned) stats->tbd_size);
@@ -1475,7 +1583,8 @@ int tbd_stats_print(const tbd_stats_t* stats)
 
   
   total_printed += puts("}");
-  
+
+#endif/*TBD_INCLUDE_STDIO*/  
   
   return total_printed;
 }
@@ -1485,6 +1594,8 @@ int tbd_stats_print(const tbd_stats_t* stats)
 
 int tbd_print_stats(const tbd_t* tbd)
 {
+  TBD_ASSERT(tbd);
+  
   tbd_stats_t stats;
   
   tbd_stats_get(&stats, tbd);
@@ -1508,12 +1619,15 @@ static size_t tbd_key_to_json(char* json, size_t json_size, const tbd_key_t* key
   TBD_ASSERT(json_size);
   TBD_ASSERT(key);
   
-  size_t printed = 0;
   size_t total_printed = 0;
   
-  printed = snprintf(json, json_size, "%s", key->str); 
+#ifdef TBD_INCLUDE_STDIO  
+  
+  size_t printed = snprintf(json, json_size, "%s", key->str); 
   
   total_printed += printed;
+  
+#endif
   
   return total_printed;
 }
@@ -1527,9 +1641,12 @@ static size_t tbd_value_to_json(char* json, size_t json_size, const tbd_value_t*
   TBD_ASSERT(json_size);
   TBD_ASSERT(value);
   
-  size_t printed = 0;
   size_t total_printed = 0;
 
+#ifdef TBD_INCLUDE_STDIO
+  
+  size_t printed = 0;
+    
   switch(format)
   {
     case TBD_VALUE_TO_JSON_FORMAT_RAW:
@@ -1574,6 +1691,8 @@ static size_t tbd_value_to_json(char* json, size_t json_size, const tbd_value_t*
     }
   }
 
+#endif//TBD_INCLUDE_STDIO  
+  
   return total_printed;
 }
 
@@ -1586,6 +1705,10 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
   TBD_ASSERT(json_size);
   TBD_ASSERT(tbd);
   TBD_ASSERT(key);
+
+  size_t total_printed = 0;
+  
+#ifdef TBD_INCLUDE_STDIO  
   
   // find the element
   const tbd_keyvalue_t* ptr = tbd_keyvalue_find_const(tbd, key);
@@ -1595,7 +1718,6 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
   }  
   
   size_t printed = 0;
-  size_t total_printed = 0;
 
   if (ptr->key.size)
   {
@@ -1617,6 +1739,7 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
   json += printed;
   json_size -= printed;
   
+#endif//TBD_INCLUDE_STDIO  
   
   return total_printed;
 }
@@ -1626,11 +1749,19 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
 
 size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format, TBD_VALUE_TO_JSON_FORMAT_ENUM value_format)
 {
+  TBD_ASSERT(json);
+  TBD_ASSERT(json_size);
+  TBD_ASSERT(tbd);
+  
+  
+  size_t total_printed = 0;
+  
+#ifdef TBD_INCLUDE_STDIO  
+  
   tbd_keyvalue_t* keyvalue_ptr = tbd->stack.start;
   
   size_t printed = 0;
-  size_t total_printed = 0;
-  
+
   const tbd_keyvalue_t* keyvalue_end = tbd_keyvalue_stack_top(&tbd->stack);
   
   if (keyvalue_ptr != keyvalue_end)
@@ -1671,5 +1802,8 @@ size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JS
       }
     }
   }
+
+#endif//TBD_INCLUDE_STDIO
+  
   return total_printed;
 }
