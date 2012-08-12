@@ -5,18 +5,34 @@
  * The tbd library has the following design features:
  *
  * - Used as a datastore inside a user-defined contiguous block of memory.
- * - Only uses standard C library
- * - Does not require any file I/O
- * - Does not call malloc() or free()
- * - Is serializeable in JSON format
+ * - Supports CRUD operations (Create, Read, Update, Delete).
+ * - Written in C.  Requires C99 support.
+ * - Only uses standard C library.
+ * - Does not require any file I/O.
+ * - Does not require calls to malloc() or free().
+ * - Is serializeable in JSON format.
  *
  * The tbd library stores data in key-value pairs.
  *
  * Garbage collection is used to reclaim key-value pairs that are no longer used.
  *
+ * By default when compiling with NDEBUG, parameters passed a function arguments are not checked for NULL or invalid values.
+ * Uses assert() to detect null pointer conditions when compiling in debug mode.
+ *
  * Author: Joshua Petitt
  * Available at: https://github.com/jpmec/tbd
  *
+ * Copyright (c) 2012 Joshua Petitt
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
+ * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, 
+ * INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. 
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 
@@ -31,9 +47,9 @@
 
 /** Maximum number of characters for a tbd key.  Includes null terminator.
  */
-#define TBD_MAX_KEY_LENGTH    (8u)
-
-
+#define TBD_SIZE_T            unsigned char
+#define TBD_MAX_SIZE          ((TBD_SIZE_T) -1)
+#define TBD_MAX_KEY_LENGTH    (1u)
 
 
 /* Forward declarations for opaque structures. */
@@ -63,8 +79,8 @@ typedef struct tbd_struct tbd_t;
 typedef struct tbd_init_struct
 {
   void* start;       ///< Start of the tbd.
-  size_t size;       ///< Size in bytes of the tbd. 
-  size_t hunk_size;  ///< The minimum size allocated from tbd heap. 
+  TBD_SIZE_T size;       ///< Size in bytes of the tbd. 
+  TBD_SIZE_T hunk_size;  ///< The minimum size allocated from tbd heap. 
   
 } tbd_init_t;
 
@@ -93,9 +109,16 @@ int tbd_is_error(int value);
 void tbd_clear(tbd_t* tbd);
 
 
-/** Empty a tbd. 
+/** Empty a tbd.  Deletes all key:value pairs. 
+ *  Does not clear stack and heap locations. 
  */
 void tbd_empty(tbd_t* tbd);
+
+
+/** Returns 1 if the tbd is empty,
+ *  Returns 0 otherwise.
+ */
+int tbd_is_empty(const tbd_t* tbd);
 
 
 /** Return total allocated size in bytes for the tbd.
@@ -116,6 +139,12 @@ size_t tbd_size_used(const tbd_t* tbd);
 /** Return number of keyvalues stored in the tbd.
  */
 size_t tbd_count(const tbd_t* tbd);
+
+
+/** Copy data from one tbd to another.
+ *  Returns TBD_NO_ERROR if successful.
+ */
+int tbd_copy(tbd_t* dest, const tbd_t* src);
 
 
 

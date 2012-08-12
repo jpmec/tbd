@@ -205,13 +205,13 @@ void tbds_start(const struct tbds_start_params* params)
 
   char cmd_buffer[9] = {0};
   
-  unsigned tbd_buffer[1024];
+  unsigned tbd_buffer[TBD_MAX_SIZE];
   
   
   const tbd_init_t tbd_params = {
   
     .start = tbd_buffer,
-    .size = sizeof(tbd_buffer),
+    .size = sizeof(tbd_buffer) & TBD_MAX_SIZE,
     .hunk_size = sizeof(unsigned),
   };
   
