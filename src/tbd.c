@@ -106,10 +106,10 @@
 #define TBD_USE_NULL_TERMINATED_VALUES
 
 // Cache the last found key:value.
-//#define TBD_USE_LAST_FOUND_CACHE
+#define TBD_USE_LAST_FOUND_CACHE
 
 // Use a list for accessing garbage elements.
-//#define TBD_USE_GARBAGE_LIST
+#define TBD_USE_GARBAGE_LIST
 
 // Create the smallest possible database.
 // The is requires keys and values to be null terimated strings.
@@ -405,8 +405,8 @@ static void tbd_keyvalue_recycle(tbd_keyvalue_t* self)
   tbd_keyvalue_set_garbage(self, false);
   
   #ifdef TBD_USE_GARBAGE_LIST    
-  keyvalue->next_garbage = NULL;
-  keyvalue->prev_garbage = NULL;
+    self->next_garbage = NULL;
+    self->prev_garbage = NULL;
   #endif
 }
 
@@ -898,13 +898,14 @@ static void tbd_garbage_list_clear(tbd_garbage_list_t* garbage)
 
 
 
-static TBD_SIZE_T tbd_garbage_list_count(tbd_garbage_list_t* self)
+
+static TBD_SIZE_T tbd_garbage_list_count(const tbd_garbage_list_t* self)
 {
   TBD_ASSERT(self);
   
   size_t result = 0;
   
-  tbd_keyvalue_t* ptr = tbd->garbage.front;
+  tbd_keyvalue_t* ptr = self->front;
   
   while (ptr)
   {
@@ -988,7 +989,7 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
     }
   }
   
-  keyvalue->is_garbage = true;
+  tbd_keyvalue_set_garbage(keyvalue, true);
 }
 
 
@@ -1023,7 +1024,7 @@ static void tbd_garbage_list_delete(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
     next->prev_garbage = keyvalue->prev_garbage;
   }
   
-  keyvalue->is_garbage = false;
+  tbd_keyvalue_set_garbage(keyvalue, false);
 }
 
 
@@ -1087,7 +1088,7 @@ static void tbd_reclaim_garbage(tbd_t* tbd, tbd_keyvalue_t* keyvalue)
   TBD_ASSERT(keyvalue);
   
   #if defined(TBD_USE_GARBAGE_LIST)
-    tbd_garbage_list_delete(&tbd->garbage, btm.ptr);  
+    tbd_garbage_list_delete(&tbd->garbage, keyvalue);  
   #endif
 }
 
@@ -1211,7 +1212,7 @@ static tbd_keyvalue_t* tbd_keyvalue_find(tbd_t* tbd, const char* key)
 #ifdef TBD_USE_LAST_FOUND_CACHE  
   
   // Look in cached pointer first.
-  if (tbd->last_found && !tbd->last_found->is_garbage && tbd_keyvalue_keycmp(tbd->last_found, key) == 0)
+  if (tbd->last_found && !tbd_keyvalue_is_garbage(tbd->last_found) && tbd_keyvalue_keycmp(tbd->last_found, key) == 0)
   {
     return tbd->last_found;
   }
@@ -1310,6 +1311,16 @@ size_t tbd_count(const tbd_t* tbd)
   TBD_ASSERT(tbd);
   
   return tbd->stack.count;
+}
+
+
+
+
+TBD_SIZE_T tbd_max_count(const tbd_t* tbd, TBD_SIZE_T keyvalue_size)
+{
+  // TODO implement this
+  
+  return 0;  
 }
 
 
@@ -1623,7 +1634,7 @@ size_t tbd_garbage_count(const tbd_t* tbd)
   TBD_ASSERT(tbd);  
   
   #if defined(TBD_USE_GARBAGE_LIST)
-    return tbd_garbage_list_count();
+    return tbd_garbage_list_count(&tbd->garbage);
   #else
    
     // TODO iterate over keyvalue stack and count garbage

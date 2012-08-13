@@ -92,6 +92,7 @@ static int test_Foo(void)
 
 
 
+
 static int test_tbd_size(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
@@ -172,6 +173,9 @@ static int test_tbd_create__fill_tbd(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
   
+  const TBD_SIZE_T max_count = tbd_max_count(tbd, sizeof(struct Foo));
+  
+  
   struct Foo foo = {1, "1"};
   char key[TBD_MAX_KEY_LENGTH + 1] = {0};
   char key_n = 0;
@@ -193,6 +197,8 @@ static int test_tbd_create__fill_tbd(tbd_t* tbd)
       assert(key_count == key_n);
     }
   }
+  
+  //assert(max_count == tbd_count(tbd));
   
   tbd_print_stats(tbd);
   

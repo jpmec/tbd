@@ -141,6 +141,11 @@ size_t tbd_size_used(const tbd_t* tbd);
 size_t tbd_count(const tbd_t* tbd);
 
 
+/** Return maximum number of keyvalues of a given size that can be stored.
+ */
+TBD_SIZE_T tbd_max_count(const tbd_t* tbd, TBD_SIZE_T keyvalue_size);
+
+
 /** Copy data from one tbd to another.
  *  Returns TBD_NO_ERROR if successful.
  */
