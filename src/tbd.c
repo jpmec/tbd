@@ -115,7 +115,10 @@
 // The is requires keys and values to be null terimated strings.
 #define TBD_MAKE_TINY
 
-
+// Pack structs
+// This will minimize the overhead used by tbd.
+// If defined some functions may run slower because of unaligned memory accesses.
+#define TBD_USE_PACKED_STRUCTS
 
 
 
@@ -149,8 +152,23 @@
 
 
 
+#if defined(TBD_USE_PACKED_STRUCTS)
+
+  #define TBD_BEGIN_PACKED_STRUCT    _Pragma("pack(1)")
+  #define TBD_END_PACKED_STRUCT    _Pragma("pack()")
+
+#else
+
+  #define TBD_START_PACKED_STRUCT
+  #define TBD_END_PACKED_STRUCT
+
+#endif
+
+
+
 /** Key reference structure.
  */
+TBD_BEGIN_PACKED_STRUCT
 typedef struct tbd_key_struct
 {
   char* str;           ///< Pointer to key string data.
@@ -160,6 +178,7 @@ typedef struct tbd_key_struct
 #endif  
   
 } tbd_key_t;
+TBD_END_PACKED_STRUCT
 
 
 
@@ -197,6 +216,7 @@ static TBD_SIZE_T tbd_key_size(const tbd_key_t* key)
 
 /** Value reference structure.
  */
+TBD_BEGIN_PACKED_STRUCT
 typedef struct tbd_value_struct
 {
   unsigned char* data;     ///< Pointer to generic stored data.
@@ -206,7 +226,7 @@ typedef struct tbd_value_struct
 #endif
   
 } tbd_value_t;
-
+TBD_END_PACKED_STRUCT
 
 
 
@@ -246,12 +266,14 @@ static TBD_SIZE_T tbd_value_size(const tbd_value_t* self)
 /** Heap structure.
  *  Represents range of contiguous memory.
  */
+TBD_BEGIN_PACKED_STRUCT
 typedef struct tbd_heap_struct
 {
   unsigned char* top;       ///< Pointer to top of heap.
   TBD_SIZE_T size;          ///< Size in bytes of allocated heap. 
   
 } tbd_heap_t;
+TBD_END_PACKED_STRUCT
 
 
 
@@ -312,16 +334,26 @@ static unsigned char* tbd_heap_pop(tbd_heap_t* heap, TBD_SIZE_T hunk_size)
 
 
 
+TBD_BEGIN_PACKED_STRUCT
+typedef struct tbd_keyvalue_flags
+{
+  unsigned char is_garbage : 1;
+  
+} tbd_keyvalue_flags_t;
+TBD_END_PACKED_STRUCT
+
+
 
 /** Key-Value pair structure.
  */
+TBD_BEGIN_PACKED_STRUCT
 typedef struct tbd_keyvalue_struct
 { 
   tbd_heap_t heap;      ///< Heap data allocated to this keyvalue.
   tbd_key_t key;        ///< The key reference.
   tbd_value_t value;    ///< The value reference.
   
-  bool is_garbage;                             ///< True if the data in the keyvalue is garbage (i.e. ready to be reclaimed).
+  tbd_keyvalue_flags_t flags;
   
 #ifdef TBD_USE_GARBAGE_LIST  
   struct tbd_keyvalue_struct* prev_garbage;    ///< Pointer to previous element before this that is garbage.
@@ -329,7 +361,7 @@ typedef struct tbd_keyvalue_struct
 #endif  
   
 } tbd_keyvalue_t;
-
+TBD_END_PACKED_STRUCT
 
 
 
@@ -343,7 +375,7 @@ static void tbd_keyvalue_clear(tbd_keyvalue_t* keyvalue)
   tbd_value_clear(&keyvalue->value);
   tbd_heap_clear(&keyvalue->heap);
 
-  keyvalue->is_garbage = true;
+  keyvalue->flags.is_garbage = true;
   
 #ifdef TBD_USE_GARBAGE_LIST   
   keyvalue->prev_garbage = NULL;
@@ -1020,7 +1052,7 @@ static tbd_keyvalue_t* tbd_find_first_garbage_hunk(tbd_t* tbd, TBD_SIZE_T hunk_s
   {
     while (!tbd_keyvalue_stack_reverse_iterator_is_equal(&btm_end, &btm))
     {
-      if (btm.ptr->is_garbage && (btm.ptr->heap.size == hunk_size))
+      if (btm.ptr->flags.is_garbage && (btm.ptr->heap.size == hunk_size))
       {                
         return btm.ptr;
       }
@@ -1073,7 +1105,7 @@ static tbd_keyvalue_t* tbd_create_keyvalue(tbd_t* tbd, TBD_SIZE_T key_size, TBD_
     keyvalue->heap.size = hunk_size;  
 
     // initialize garbage list node
-    keyvalue->is_garbage = false;
+    keyvalue->flags.is_garbage = false;
     
 #ifdef TBD_USE_GARBAGE_LIST    
     keyvalue->next_garbage = NULL;
@@ -1152,7 +1184,7 @@ static tbd_keyvalue_t* tbd_keyvalue_find(tbd_t* tbd, const char* key)
   
   while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
   {
-    if (!iter.ptr->is_garbage && (tbd_keyvalue_keycmp(iter.ptr, key) == 0))
+    if (!iter.ptr->flags.is_garbage && (tbd_keyvalue_keycmp(iter.ptr, key) == 0))
     {
       
 #ifdef TBD_USE_LAST_FOUND_CACHE      
@@ -1373,7 +1405,7 @@ int tbd_delete(tbd_t* tbd, const char* key)
     tbd_garbage_list_insert(&tbd->garbage, ptr);
   #endif  
   
-  ptr->is_garbage = true;
+  ptr->flags.is_garbage = true;
   
   return TBD_NO_ERROR;
 }
@@ -1637,13 +1669,13 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
   
   while ((garbage_total < garbage_limit) && (top.ptr != top_end.ptr) && (btm.ptr != btm_end.ptr))
   { 
-    if (top.ptr->is_garbage)
+    if (top.ptr->flags.is_garbage)
     {
       tbd_keyvalue_stack_iterator_next(&top);
       continue;  
     }
     
-    if (!btm.ptr->is_garbage)
+    if (!btm.ptr->flags.is_garbage)
     {
       tbd_keyvalue_stack_reverse_iterator_next(&btm);
       continue;
@@ -1653,7 +1685,7 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
     
     while (temp_top.ptr != top_end.ptr)
     {
-      if (temp_top.ptr->is_garbage)
+      if (temp_top.ptr->flags.is_garbage)
       {
         tbd_keyvalue_stack_iterator_next(&temp_top);
         continue;  
@@ -1671,8 +1703,8 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
       {
         garbage_total += tbd_keyvalue_copy(btm.ptr, temp_top.ptr);
         
-        btm.ptr->is_garbage = false;
-        temp_top.ptr->is_garbage = true;
+        btm.ptr->flags.is_garbage = false;
+        temp_top.ptr->flags.is_garbage = true;
         
 #if defined(TBD_USE_GARBAGE)
         
@@ -1738,7 +1770,7 @@ size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
   
   while(src.ptr != end.ptr)
   {
-    if (dest.ptr->is_garbage && !src.ptr->is_garbage)
+    if (dest.ptr->flags.is_garbage && !src.ptr->flags.is_garbage)
     {
       const size_t src_size = src.ptr->heap.size;
       const size_t dest_size = dest.ptr->heap.size;
@@ -2094,7 +2126,7 @@ size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JS
     // go to first item
     while (keyvalue_ptr != keyvalue_end)
     {
-      if (!keyvalue_ptr->is_garbage)
+      if (!keyvalue_ptr->flags.is_garbage)
         break;
       
       ++keyvalue_ptr;
