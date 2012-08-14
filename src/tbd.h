@@ -47,9 +47,9 @@
 
 /** Maximum number of characters for a tbd key.  Includes null terminator.
  */
-#define TBD_SIZE_T            unsigned char
+#define TBD_SIZE_T            size_t
 #define TBD_MAX_SIZE          ((TBD_SIZE_T) -1)
-#define TBD_MAX_KEY_LENGTH    (1u)
+#define TBD_MAX_KEY_LENGTH    (8u)
 
 
 /* Forward declarations for opaque structures. */
@@ -144,6 +144,11 @@ size_t tbd_count(const tbd_t* tbd);
 /** Return maximum number of keyvalues of a given size that can be stored.
  */
 TBD_SIZE_T tbd_max_count(const tbd_t* tbd, TBD_SIZE_T keyvalue_size);
+
+
+/** Return the maximum key length.
+ */
+TBD_SIZE_T tbd_max_key_length(const tbd_t* tbd);
 
 
 /** Copy data from one tbd to another.

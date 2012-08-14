@@ -1080,6 +1080,8 @@ static TBD_SIZE_T tbd_keyvalue_hunk_size(const tbd_t* tbd, TBD_SIZE_T key_size, 
 }
 
 
+
+
 /**
  */
 static void tbd_reclaim_garbage(tbd_t* tbd, tbd_keyvalue_t* keyvalue)
@@ -1321,6 +1323,14 @@ TBD_SIZE_T tbd_max_count(const tbd_t* tbd, TBD_SIZE_T keyvalue_size)
   // TODO implement this
   
   return 0;  
+}
+
+
+
+
+TBD_SIZE_T tbd_max_key_length(const tbd_t* tbd)
+{
+  return TBD_MAX_KEY_LENGTH;  
 }
 
 
