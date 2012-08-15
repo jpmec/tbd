@@ -272,24 +272,24 @@ size_t tbd_garbage_clean(tbd_t* tbd);
 typedef struct tbd_stats_struct
 {
   unsigned tbd_address;
-  size_t   tbd_size;
-  size_t   tbd_size_used;
-  size_t   tbd_head_size;
+  TBD_SIZE_T   tbd_size;
+  TBD_SIZE_T   tbd_size_used;
+  TBD_SIZE_T   tbd_head_size;
   
-  size_t   tbd_keyvalue_size;    ///< Size of a tbd_keyvalue_t element in bytes
+  TBD_SIZE_T   tbd_keyvalue_size;    ///< Size of a tbd_keyvalue_t element in bytes
   
   unsigned stack_top;       ///< Address of top element.
   unsigned stack_btm;       ///< Address of bottom element.
-  size_t   stack_count;     ///< Number of elements in stack.
-  size_t   stack_size;      ///< Size of stack in bytes.
+  TBD_SIZE_T   stack_count;     ///< Number of elements in stack.
+  TBD_SIZE_T   stack_size;      ///< Size of stack in bytes.
   
   unsigned heap_top;        ///< Top of heap.
-  size_t   heap_size;       ///< Size of heap in bytes.
+  TBD_SIZE_T   heap_size;       ///< Size of heap in bytes.
   
   unsigned garbage_front;   ///< First element of garbage.
   unsigned garbage_back;    ///< Last element of garbage.
-  size_t garbage_size;      ///< Number of bytes of garbage.
-  size_t garbage_count;     ///< Number of garbage elements.
+  TBD_SIZE_T garbage_size;      ///< Number of bytes of garbage.
+  TBD_SIZE_T garbage_count;     ///< Number of garbage elements.
   
 } tbd_stats_t;
 

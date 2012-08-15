@@ -57,7 +57,7 @@ VALUE method_max_key_length(VALUE self)
 
 VALUE method_create(VALUE self, VALUE key, VALUE value) {
   
-  int result = tbd_create(tbd, RSTRING(key)->ptr, RSTRING(value)->ptr, RSTRING(value)->len);
+  int result = tbd_create(tbd, RSTRING(key)->ptr, RSTRING(value)->ptr, RSTRING(value)->len + 1);
   
   return INT2NUM(result);
 }
@@ -67,17 +67,26 @@ VALUE method_create(VALUE self, VALUE key, VALUE value) {
 
 VALUE method_read(VALUE self, VALUE key) {
   
-	int x = tbd_read_size(tbd, RSTRING(key)->ptr);
+	const size_t value_size = tbd_read_size(tbd, RSTRING(key)->ptr);
 	
-  return INT2NUM(x);
+  char* value = ALLOC_N(char, value_size);
+  
+  int result = tbd_read(tbd, RSTRING(key)->ptr, value, value_size);
+  
+  if (TBD_NO_ERROR == result)
+    return rb_str_new2(value);
+  else
+    return Qnil;
 }
 
 
 
 
 VALUE method_update(VALUE self, VALUE key, VALUE value) {
-	int x = 10;
-	return INT2NUM(x);
+  
+  int result = tbd_update(tbd, RSTRING(key)->ptr, RSTRING(value)->ptr, RSTRING(value)->len + 1);
+  
+	return INT2NUM(result);
 }
 
 
