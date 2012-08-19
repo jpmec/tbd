@@ -77,6 +77,10 @@ typedef struct tbd_const_iterator_struct tbd_const_iterator_t;
 
 
 
+
+
+
+
 /** Structure for initializing tbd.
  */
 typedef struct tbd_init_struct
@@ -165,6 +169,15 @@ int tbd_copy(tbd_t* dest, const tbd_t* src);
 int tbd_sort_by_key(tbd_t* tbd);
 
 
+/** Sort the tbd keyvalues in heap order.
+ */
+int tbd_sort_by_heap(tbd_t* tbd);
+
+
+
+
+
+
 
 
 /* 
@@ -201,6 +214,10 @@ int tbd_update(tbd_t* tbd, const char* key, const void* value, size_t value_size
  *  Returns TBD_NO_ERROR if successful.
  */
 int tbd_delete(tbd_t* tbd, const char* key);
+
+
+
+
 
 
 
@@ -336,7 +353,11 @@ size_t tbd_garbage_clean(tbd_t* tbd);
 
 
 
-/* Statistics and other general info.
+/* 
+ * Statistics and other general info.
+ */
+
+/** Struct to hold statistics about a tbd.
  */
 typedef struct tbd_stats_struct
 {
@@ -384,9 +405,13 @@ int tbd_print_stats(const tbd_t* tbd);
 
 
 
-/* JSON support
- */
 
+
+
+
+/* 
+ * JSON support
+ */
 
 
 typedef enum TBD_KEY_TO_JSON_FORMAT
@@ -429,6 +454,8 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
 /** Copy json string into tbd datastore.  Will overwrite old contents.
  */
 int tbd_from_json(tbd_t* tbd, const char* json);
+
+
 
 
 

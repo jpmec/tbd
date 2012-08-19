@@ -190,6 +190,102 @@ static int test_tbd_sort_by_key(tbd_t* tbd)
 
 
 
+static int test_tbd_sort_by_heap(tbd_t* tbd)
+{
+  START_TEST_TBD(tbd); 
+  
+  // exercise with empty tbd
+  int tbd_sort_result = tbd_sort_by_heap(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);  
+  
+  
+  // setup with elements
+  struct Foo foo1 = {1, "u"};  
+  int tbd_create_result = tbd_create(tbd, "u", &foo1, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);
+  
+  struct Foo foo2 = {2, "v"};  
+  tbd_create_result = tbd_create(tbd, "v", &foo2, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);  
+  
+  struct Foo foo3 = {3, "w"};  
+  tbd_create_result = tbd_create(tbd, "w", &foo3, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);
+  
+  struct Foo foo4 = {4, "x"};  
+  tbd_create_result = tbd_create(tbd, "x", &foo4, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);
+  
+  struct Foo foo5 = {5, "y"};  
+  tbd_create_result = tbd_create(tbd, "y", &foo5, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);  
+  
+  struct Foo foo6 = {6, "z"};  
+  tbd_create_result = tbd_create(tbd, "z", &foo6, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);   
+  
+  tbd_sort_result = tbd_sort_by_key(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);   
+  
+  
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
+  
+
+  // exercise
+  tbd_sort_result = tbd_sort_by_heap(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);
+  
+  
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
+  
+
+  // sort by keys
+  tbd_sort_result = tbd_sort_by_key(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);  
+  
+  // setup with deleted keyvalues
+  int tbd_delete_result = tbd_delete(tbd, "x"); 
+  assert(TBD_NO_ERROR == tbd_delete_result);
+  
+  tbd_delete_result = tbd_delete(tbd, "y");
+  assert(TBD_NO_ERROR == tbd_delete_result);  
+  
+  
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
+
+  
+  // exercise
+  tbd_sort_result = tbd_sort_by_heap(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);
+  
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
+  
+  
+  
+  struct Foo foo_result;
+  int tbd_read_result = tbd_read(tbd, "u", &foo_result, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_read_result); 
+  assert(1 == foo_result.n);  
+  
+  tbd_read_result = tbd_read(tbd, "z", &foo_result, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_read_result); 
+  assert(6 == foo_result.n);
+  
+  FINISH_TEST_TBD(tbd);   
+  return TBD_NO_ERROR;
+}
+
+
+
+
 static int test_tbd_create(tbd_t* tbd)
 {
   START_TEST_TBD(tbd);  
@@ -769,6 +865,7 @@ int test_tbd(void)
   assert(TBD_NO_ERROR == test_tbd_size(tbd));
   assert(TBD_NO_ERROR == test_tbd_size_used(tbd));
   assert(TBD_NO_ERROR == test_tbd_sort_by_key(tbd));
+  assert(TBD_NO_ERROR == test_tbd_sort_by_heap(tbd));
   
   
   /* Test the basic CRUD */

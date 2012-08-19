@@ -298,6 +298,28 @@ static unsigned char* tbd_heap_end(const tbd_heap_t* heap)
 
 
 
+static int tbd_heap_cmp(const tbd_heap_t* heap1, const tbd_heap_t* heap2)
+{
+  TBD_ASSERT(heap1);
+  TBD_ASSERT(heap2);
+  
+  if (heap1->top < heap2->top)
+  {
+    return -1;
+  }
+  else if (heap1->top > heap2->top)
+  {
+    return 1;
+  }
+  else
+  {
+    return 0;
+  }
+}
+
+
+
+
 static void tbd_heap_clear(tbd_heap_t* heap)
 {
   TBD_ASSERT(heap);
@@ -497,6 +519,19 @@ static int tbd_keyvalue_cmp(const tbd_keyvalue_t* keyvalue1, const tbd_keyvalue_
 
 
 
+/** Keyvalue comparison of heap locations.
+ */
+static int tbd_keyvalue_cmp_heap(const tbd_keyvalue_t* keyvalue1, const tbd_keyvalue_t* keyvalue2)
+{
+  TBD_ASSERT(keyvalue1);
+  TBD_ASSERT(keyvalue2);
+  
+  return tbd_heap_cmp(&keyvalue1->heap, &keyvalue2->heap);
+}
+
+
+
+
 /** Copy keyvalue data from src to dest.
  */
 static TBD_SIZE_T tbd_keyvalue_copy(tbd_keyvalue_t* dest, const tbd_keyvalue_t* src)
@@ -536,6 +571,33 @@ static void tbd_keyvalue_swap(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalu
   temp = *keyvalue1;
   *keyvalue1 = *keyvalue2;
   *keyvalue2 = temp;
+}
+
+
+
+
+/** Merge two garbage values
+ */
+static void tbd_keyvalue_merge_garbage(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalue2)
+{
+  TBD_ASSERT(keyvalue1);
+  TBD_ASSERT(keyvalue2);
+  
+  // check that both elements are garbage
+  if (!tbd_keyvalue_is_garbage(keyvalue1) || !tbd_keyvalue_is_garbage(keyvalue2))
+  {
+    return;
+  }
+  
+  // check that heaps are contiguous
+  if (tbd_heap_end(&keyvalue1->heap) == tbd_heap_begin(&keyvalue2->heap))
+  {
+    //TODO finish implementing this
+    assert(0);
+  }
+  
+  //TODO finish implementing this
+  assert(0);  
 }
 
 
@@ -997,6 +1059,41 @@ static bool tbd_keyvalue_stack_bubble_by_key(tbd_keyvalue_stack_t* stack)
 
 
 
+static bool tbd_keyvalue_stack_bubble_by_heap(tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  if (tbd_keyvalue_stack_count(stack) < 2)
+  {
+    return false;
+  }
+  
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(stack);  
+  
+  tbd_keyvalue_stack_iterator_t next = tbd_keyvalue_stack_begin(stack);
+  tbd_keyvalue_stack_iterator_t prev = tbd_keyvalue_stack_begin(stack);  
+  tbd_keyvalue_stack_iterator_next(&next);
+  
+  bool swapped = false;
+  do
+  {
+    if (tbd_keyvalue_cmp_heap(prev.ptr, next.ptr) > 0)
+    {
+      tbd_keyvalue_swap(prev.ptr, next.ptr);
+      swapped = true;
+    }
+    
+    tbd_keyvalue_stack_iterator_next(&next);
+    tbd_keyvalue_stack_iterator_next(&prev);
+    
+  } while (!tbd_keyvalue_stack_iterator_is_equal(&end, &next));
+  
+  return swapped;
+}
+
+
+
+
 static void tbd_keyvalue_stack_sort_by_key(tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
@@ -1005,6 +1102,24 @@ static void tbd_keyvalue_stack_sort_by_key(tbd_keyvalue_stack_t* stack)
   do
   {
     if (!tbd_keyvalue_stack_bubble_by_key(stack))
+    {
+      break;
+    }
+    
+  } while (1);
+}
+
+
+
+
+static void tbd_keyvalue_stack_sort_by_heap(tbd_keyvalue_stack_t* stack)
+{
+  TBD_ASSERT(stack);
+  
+  // run bubble sort until no elements are swapped
+  do
+  {
+    if (!tbd_keyvalue_stack_bubble_by_heap(stack))
     {
       break;
     }
@@ -1489,6 +1604,18 @@ int tbd_sort_by_key(tbd_t* tbd)
   TBD_ASSERT(tbd);
   
   tbd_keyvalue_stack_sort_by_key(&tbd->stack);
+  
+  return TBD_NO_ERROR;
+}
+
+
+
+
+int tbd_sort_by_heap(tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  tbd_keyvalue_stack_sort_by_heap(&tbd->stack);
   
   return TBD_NO_ERROR;
 }
@@ -2480,19 +2607,21 @@ size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_
   
   // print the rest of the keys
   while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
-  {  
-    printed = snprintf(json, json_size, ",");
-
-    total_printed += printed;    
-    json += printed;
-    json_size -= printed;
-        
-    printed = tbd_key_to_json(json, json_size, &iter.ptr->key, key_format);
+  {
+    if (!tbd_keyvalue_is_garbage(iter.ptr))
+    {
+      printed = snprintf(json, json_size, ",");
+      
+      total_printed += printed;    
+      json += printed;
+      json_size -= printed;      
+      
+      printed = tbd_key_to_json(json, json_size, &iter.ptr->key, key_format);
     
-    total_printed += printed;    
-    json += printed;
-    json_size -= printed;
-        
+      total_printed += printed;    
+      json += printed;
+      json_size -= printed;
+    }   
     tbd_keyvalue_stack_const_iterator_next(&iter);
   }
   
@@ -2513,6 +2642,9 @@ size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_
 
 
 
+/**
+ *  TODO: Convert to use iterators.
+ */
 size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format, TBD_VALUE_TO_JSON_FORMAT_ENUM value_format)
 {
   TBD_ASSERT(json);
