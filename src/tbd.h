@@ -53,6 +53,8 @@
 #define TBD_MAX_KEY_LENGTH    (8u)
 
 
+
+
 /* Forward declarations for opaque structures. */
 struct tbd_struct;
 struct tbd_const_iterator_struct;
@@ -302,12 +304,21 @@ const void* tbd_const_iterator_value(const tbd_const_iterator_t i);
 
 /** Return number of bytes of garbage.
  */
-size_t tbd_garbage_size(const tbd_t* tbd);
+TBD_SIZE_T tbd_garbage_size(const tbd_t* tbd);
 
 
 /** Number of keyvalues that are garbage.
  */
-size_t tbd_garbage_count(const tbd_t* tbd);
+TBD_SIZE_T tbd_garbage_count(const tbd_t* tbd);
+
+
+/** Combine keyvalues that are garbage and are located next to each other in the heap.
+ *  Re-assigns values so lowest keyvalue stack element references garbage 
+ *  and highest keyvalue stack element references none of the heap.
+ *  This function is the most effective if tbd_sort_by_heap has been called prior to this function,
+ *  however the tbd is not required to be in heap sorted order.
+ */
+TBD_SIZE_T tbd_garbage_merge(tbd_t* tbd);
 
 
 /** Collect up to a given number of bytes of garbage from the top of the stack and heap.
@@ -318,7 +329,7 @@ size_t tbd_garbage_count(const tbd_t* tbd);
  *
  *  TODO: is garbage_limit needed?
  */
-size_t tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit);
+TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit);
 
 
 /** Fold a given number of used bytes in garbage bytes.
@@ -328,24 +339,24 @@ size_t tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit);
  *  Invalidates existing pointers.
  *  
  */
-size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit);
+TBD_SIZE_T tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit);
 
 
 /** Pack up to a given number of bytes of garbage so that heap is contiguous.
  */
-size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit);
+TBD_SIZE_T tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit);
 
 
 /** Collect up to a given number of bytes of garbage.
  *  This will pop, fold and pack garbage until limit is reached.
  */
-size_t tbd_garbage_collect(tbd_t* tbd, size_t garbage_limit);
+TBD_SIZE_T tbd_garbage_collect(tbd_t* tbd, size_t garbage_limit);
 
 
 /** Clean out all the garbage.
  *  This will collect all garbage.  tbd_garbage_size() should always be 0 after this function.
  */
-size_t tbd_garbage_clean(tbd_t* tbd);
+TBD_SIZE_T tbd_garbage_clean(tbd_t* tbd);
 
 
 

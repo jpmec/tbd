@@ -278,6 +278,21 @@ TBD_END_PACKED_STRUCT
 
 
 
+
+/** Return number of bytes allocated to heap.
+ */
+static TBD_SIZE_T tbd_heap_size(const tbd_heap_t* heap)
+{
+  TBD_ASSERT(heap);
+  
+  return heap->size;
+}
+
+
+
+
+/** Return pointer to top of heap.
+ */
 static unsigned char* tbd_heap_begin(const tbd_heap_t* heap)
 {
   TBD_ASSERT(heap);
@@ -416,6 +431,13 @@ static void tbd_keyvalue_set_garbage(tbd_keyvalue_t* self, bool is_garbage)
   TBD_ASSERT(self);
   
   self->flags.is_garbage = is_garbage;
+  
+  // if trashing an element, then clear key and value information.
+  if (is_garbage)
+  {
+    tbd_key_clear(&self->key);
+    tbd_value_clear(&self->value);
+  }
 }
 
 
@@ -559,6 +581,22 @@ static TBD_SIZE_T tbd_keyvalue_copy(tbd_keyvalue_t* dest, const tbd_keyvalue_t* 
 
 
 
+/** Swap tbd_keyvalue_t pointer values.
+ */
+static void tbd_keyvalue_swap_ptr(tbd_keyvalue_t** keyvalue1, tbd_keyvalue_t** keyvalue2)
+{
+  TBD_ASSERT(keyvalue1);
+  TBD_ASSERT(keyvalue2);
+  
+  tbd_keyvalue_t** temp = keyvalue1;
+  
+  *keyvalue1 = *keyvalue2;
+  *keyvalue2 = *temp;
+}
+
+
+
+
 /** Swap values stored in two tbd_keyvalue_t.
  */
 static void tbd_keyvalue_swap(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalue2)
@@ -566,9 +604,8 @@ static void tbd_keyvalue_swap(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalu
   TBD_ASSERT(keyvalue1);
   TBD_ASSERT(keyvalue2);
   
-  tbd_keyvalue_t temp;
+  tbd_keyvalue_t temp = *keyvalue1;
   
-  temp = *keyvalue1;
   *keyvalue1 = *keyvalue2;
   *keyvalue2 = temp;
 }
@@ -578,7 +615,7 @@ static void tbd_keyvalue_swap(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalu
 
 /** Merge two garbage values
  */
-static void tbd_keyvalue_merge_garbage(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalue2)
+static TBD_SIZE_T tbd_keyvalue_merge_garbage(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t* keyvalue2)
 {
   TBD_ASSERT(keyvalue1);
   TBD_ASSERT(keyvalue2);
@@ -586,18 +623,32 @@ static void tbd_keyvalue_merge_garbage(tbd_keyvalue_t* keyvalue1, tbd_keyvalue_t
   // check that both elements are garbage
   if (!tbd_keyvalue_is_garbage(keyvalue1) || !tbd_keyvalue_is_garbage(keyvalue2))
   {
-    return;
+    return 0;
+  }
+  
+  // compare heap ordering
+  int tbd_heap_cmp_result = tbd_heap_cmp(&keyvalue1->heap, &keyvalue2->heap); 
+  
+  // swap pointers if necessary
+  if (0 < tbd_heap_cmp_result)
+  {
+    tbd_keyvalue_swap_ptr(&keyvalue1, &keyvalue2);
   }
   
   // check that heaps are contiguous
-  if (tbd_heap_end(&keyvalue1->heap) == tbd_heap_begin(&keyvalue2->heap))
+  void* heap1_end = tbd_heap_end(&keyvalue1->heap);
+  void* heap2_begin = tbd_heap_begin(&keyvalue2->heap);
+  if (heap1_end != heap2_begin)
   {
-    //TODO finish implementing this
-    assert(0);
+    return 0;
   }
   
-  //TODO finish implementing this
-  assert(0);  
+  // adjust heap sizes
+  TBD_SIZE_T heap1_size = tbd_heap_size(&keyvalue1->heap);
+  tbd_heap_push(&keyvalue2->heap, heap1_size);
+  tbd_heap_pop(&keyvalue1->heap, heap1_size);
+  
+  return tbd_heap_size(&keyvalue2->heap); 
 }
 
 
@@ -1964,7 +2015,7 @@ const void* tbd_const_iterator_value(const tbd_const_iterator_t i)
 
 /** Returns size in bytes of garbage in tbd.
  */
-size_t tbd_garbage_size(const tbd_t* tbd)
+TBD_SIZE_T tbd_garbage_size(const tbd_t* tbd)
 {
   TBD_ASSERT(tbd);
   
@@ -2002,7 +2053,7 @@ size_t tbd_garbage_size(const tbd_t* tbd)
 
 /** Returns number of garbage keyvalue elements in tbd.
  */
-size_t tbd_garbage_count(const tbd_t* tbd)
+TBD_SIZE_T tbd_garbage_count(const tbd_t* tbd)
 {
   TBD_ASSERT(tbd);  
   
@@ -2019,7 +2070,41 @@ size_t tbd_garbage_count(const tbd_t* tbd)
 
 
 
-size_t tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
+/** Merge all keyvalues in stack that are garbage and are located next to each other in heap.
+ */
+TBD_SIZE_T tbd_garbage_merge(tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  size_t total_merged = 0;
+  
+  tbd_keyvalue_stack_iterator_t prev = tbd_keyvalue_stack_begin(&tbd->stack);
+  tbd_keyvalue_stack_iterator_t next = tbd_keyvalue_stack_begin(&tbd->stack);  
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(&tbd->stack);
+  
+  if (tbd_keyvalue_stack_iterator_is_equal(&end, &next))
+  {
+    return 0;
+  }
+  
+  // increment next ahead of prev
+  tbd_keyvalue_stack_iterator_next(&next);  
+  
+  while(!tbd_keyvalue_stack_iterator_is_equal(&end, &next))
+  {
+    total_merged += tbd_keyvalue_merge_garbage(prev.ptr, next.ptr);
+    
+    tbd_keyvalue_stack_iterator_next(&next);    
+    tbd_keyvalue_stack_iterator_next(&prev);
+  }
+  
+  return total_merged;
+}
+
+
+
+
+TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
   
@@ -2071,7 +2156,7 @@ size_t tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
 
 
 
-size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
+TBD_SIZE_T tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
   
@@ -2172,7 +2257,7 @@ size_t tbd_garbage_fold(tbd_t* tbd, size_t garbage_limit)
  *  Process adjacent elements.  If lower element is garbage and upper element is used, 
  *  then copy upper element and align with bottom of lower element
  */
-size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
+TBD_SIZE_T tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
   
@@ -2231,7 +2316,7 @@ size_t tbd_garbage_pack(tbd_t* tbd, size_t garbage_limit)
 
 
 
-size_t tbd_garbage_collect(tbd_t* tbd, size_t garbage_limit)
+TBD_SIZE_T tbd_garbage_collect(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
   
@@ -2280,7 +2365,7 @@ size_t tbd_garbage_collect(tbd_t* tbd, size_t garbage_limit)
 
 
 
-size_t tbd_garbage_clean(tbd_t* tbd)
+TBD_SIZE_T tbd_garbage_clean(tbd_t* tbd)
 {
   TBD_ASSERT(tbd);
   
