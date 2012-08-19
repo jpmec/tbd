@@ -136,12 +136,12 @@ static int test_tbd_size_used(tbd_t* tbd)
 
 
 
-static int test_tbd_sort(tbd_t* tbd)
+static int test_tbd_sort_by_key(tbd_t* tbd)
 {
   START_TEST_TBD(tbd); 
 
   // exercise with empty tbd
-  int tbd_sort_result = tbd_sort(tbd);
+  int tbd_sort_result = tbd_sort_by_key(tbd);
   assert(TBD_NO_ERROR == tbd_sort_result);  
   
   
@@ -159,33 +159,20 @@ static int test_tbd_sort(tbd_t* tbd)
   assert(TBD_NO_ERROR == tbd_create_result);  
   
   
-  // iterate over elements and print
-  tbd_const_iterator_t i = tbd_const_begin(tbd);
-  tbd_const_iterator_t end = tbd_const_end(tbd);
-  
-  while (!tbd_const_iterator_is_equal(end, i))
-  {
-    printf("%s\n", tbd_const_iterator_key(i));
-    
-    i = tbd_const_iterator_next(i);    
-  }
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
   
   
   // exercise
-  tbd_sort_result = tbd_sort(tbd);
+  tbd_sort_result = tbd_sort_by_key(tbd);
   assert(TBD_NO_ERROR == tbd_sort_result);   
   
+
+  // print the keys
+  tbd_keys_to_json(json_buffer, sizeof(json_buffer), tbd, TBD_KEY_TO_JSON_FORMAT_STRING);
+  puts(json_buffer);
   
-  // iterate over elements and print
-  i = tbd_const_begin(tbd);
-  end = tbd_const_end(tbd);
-  
-  while (!tbd_const_iterator_is_equal(end, i))
-  {
-    printf("%s\n", tbd_const_iterator_key(i));
-    
-    i = tbd_const_iterator_next(i);    
-  }  
   
   struct Foo foo_result;
   int tbd_read_result = tbd_read(tbd, "x", &foo_result, sizeof(struct Foo));
@@ -781,7 +768,7 @@ int test_tbd(void)
   /* Test basic operations */
   assert(TBD_NO_ERROR == test_tbd_size(tbd));
   assert(TBD_NO_ERROR == test_tbd_size_used(tbd));
-  assert(TBD_NO_ERROR == test_tbd_sort(tbd));
+  assert(TBD_NO_ERROR == test_tbd_sort_by_key(tbd));
   
   
   /* Test the basic CRUD */

@@ -162,7 +162,7 @@ int tbd_copy(tbd_t* dest, const tbd_t* src);
 
 /** Sort the tbd keyvalues in key order.
  */
-int tbd_sort(tbd_t* tbd);
+int tbd_sort_by_key(tbd_t* tbd);
 
 
 
@@ -391,7 +391,8 @@ int tbd_print_stats(const tbd_t* tbd);
 
 typedef enum TBD_KEY_TO_JSON_FORMAT
 {
-  TBD_KEY_TO_JSON_FORMAT_RAW
+  TBD_KEY_TO_JSON_FORMAT_RAW,
+  TBD_KEY_TO_JSON_FORMAT_STRING,  
   
 } TBD_KEY_TO_JSON_FORMAT_ENUM;
 
@@ -412,6 +413,12 @@ typedef enum TBD_VALUE_TO_JSON_FORMAT
  *  Returns number of bytes written.
  */
 size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format, TBD_VALUE_TO_JSON_FORMAT_ENUM value_format);
+
+
+/** Convert tbd keys to json formatted array.  Writes to json string, result is null terminated.
+ *  Returns number of bytes written.
+ */
+size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format);
 
 
 /** Convert a keyvalue pair to json format.

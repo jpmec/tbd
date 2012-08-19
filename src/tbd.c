@@ -51,14 +51,14 @@
  *
  *
  *
+ *  Every bit of memory used in the heap is accounted for in the stack.
+ * 
  *
  * Configuration
  * =============
  * The tbd library is designed to be flexible.  It can be configured at compile time to be either small or fast.
  * The tbd library can be configured to use very little overhead.  This will reduce the amount of memory used by the header information
  * and stack.
- *
- * In the tiniest configuration for tbd, it uses the following memory
  *
  */
 
@@ -278,6 +278,25 @@ TBD_END_PACKED_STRUCT
 
 
 
+static unsigned char* tbd_heap_begin(const tbd_heap_t* heap)
+{
+  TBD_ASSERT(heap);
+  
+  return heap->top;
+}
+
+
+
+
+static unsigned char* tbd_heap_end(const tbd_heap_t* heap)
+{
+  TBD_ASSERT(heap);
+  
+  return heap->top + heap->size;
+}
+
+
+
 
 static void tbd_heap_clear(tbd_heap_t* heap)
 {
@@ -414,7 +433,7 @@ static void tbd_keyvalue_recycle(tbd_keyvalue_t* self)
 
 
 
-static bool tbd_keyvalue_is_garbage(tbd_keyvalue_t* self)
+static bool tbd_keyvalue_is_garbage(const tbd_keyvalue_t* self)
 {
   TBD_ASSERT(self);
   
@@ -663,13 +682,28 @@ static const tbd_keyvalue_t* tbd_keyvalue_stack_const_iterator_prev(tbd_keyvalue
 
 /** Test if iterators are equivalent.
  */
-static int tbd_keyvalue_stack_const_iterator_is_equal(const tbd_keyvalue_stack_const_iterator_t* self, const tbd_keyvalue_stack_iterator_t* iter)
+static int tbd_keyvalue_stack_const_iterator_is_equal(const tbd_keyvalue_stack_const_iterator_t* self, const tbd_keyvalue_stack_const_iterator_t* iter)
 {
   TBD_ASSERT(self);
   TBD_ASSERT(iter);
   
   return (self->ptr == iter->ptr);
 }
+
+
+
+
+/** Test if iterators are equivalent.
+ */
+static int tbd_keyvalue_stack_iterator_is_equal(const tbd_keyvalue_stack_const_iterator_t* self, const tbd_keyvalue_stack_iterator_t* iter)
+{
+  TBD_ASSERT(self);
+  TBD_ASSERT(iter);
+  
+  return (self->ptr == iter->ptr);
+}
+
+
 
 
 
@@ -928,7 +962,7 @@ static bool tbd_keyvalue_stack_is_contiguous(const tbd_keyvalue_stack_t* stack)
 
 
 
-static bool tbd_keyvalue_stack_bubble(tbd_keyvalue_stack_t* stack)
+static bool tbd_keyvalue_stack_bubble_by_key(tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
   
@@ -955,7 +989,7 @@ static bool tbd_keyvalue_stack_bubble(tbd_keyvalue_stack_t* stack)
     tbd_keyvalue_stack_iterator_next(&next);
     tbd_keyvalue_stack_iterator_next(&prev);
     
-  } while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &next));
+  } while (!tbd_keyvalue_stack_iterator_is_equal(&end, &next));
   
   return swapped;
 }
@@ -963,13 +997,14 @@ static bool tbd_keyvalue_stack_bubble(tbd_keyvalue_stack_t* stack)
 
 
 
-static void tbd_keyvalue_stack_sort(tbd_keyvalue_stack_t* stack)
+static void tbd_keyvalue_stack_sort_by_key(tbd_keyvalue_stack_t* stack)
 {
   TBD_ASSERT(stack);
   
+  // run bubble sort until no elements are swapped
   do
   {
-    if (!tbd_keyvalue_stack_bubble(stack))
+    if (!tbd_keyvalue_stack_bubble_by_key(stack))
     {
       break;
     }
@@ -1325,7 +1360,7 @@ static tbd_keyvalue_t* tbd_find_keyvalue(tbd_t* tbd, const char* key)
     return NULL;
   }
   
-  while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
+  while (!tbd_keyvalue_stack_iterator_is_equal(&end, &iter))
   {
     if (!tbd_keyvalue_is_garbage(iter.ptr) && (tbd_keyvalue_keycmp(iter.ptr, key) == 0))
     {
@@ -1449,11 +1484,11 @@ int tbd_copy(tbd_t* dest, const tbd_t* src)
 
 
 
-int tbd_sort(tbd_t* tbd)
+int tbd_sort_by_key(tbd_t* tbd)
 {
   TBD_ASSERT(tbd);
   
-  tbd_keyvalue_stack_sort(&tbd->stack);
+  tbd_keyvalue_stack_sort_by_key(&tbd->stack);
   
   return TBD_NO_ERROR;
 }
@@ -2244,10 +2279,20 @@ static size_t tbd_key_to_json(char* json, size_t json_size, const tbd_key_t* key
   size_t total_printed = 0;
   
 #ifdef TBD_INCLUDE_STDIO  
+
   
-  size_t printed = snprintf(json, json_size, "%s", key->str); 
-  
-  total_printed += printed;
+  switch (format)
+  {
+    case TBD_KEY_TO_JSON_FORMAT_RAW:
+    {
+      total_printed += snprintf(json, json_size, "%s", key->str);     
+    } break;
+      
+    case TBD_KEY_TO_JSON_FORMAT_STRING:
+    {
+      total_printed += snprintf(json, json_size, "\"%s\"", key->str);      
+    } break;
+  }
   
 #endif
   
@@ -2366,6 +2411,101 @@ size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, cons
   json_size -= printed;
   
 #endif//TBD_INCLUDE_STDIO  
+  
+  return total_printed;
+}
+
+
+
+
+size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format)
+{
+  TBD_ASSERT(json);
+  TBD_ASSERT(json_size);
+  TBD_ASSERT(tbd);
+  
+  
+  size_t total_printed = 0;
+  
+#ifdef TBD_INCLUDE_STDIO  
+  
+  size_t printed = 0;
+  
+  tbd_keyvalue_stack_const_iterator_t iter = tbd_keyvalue_stack_const_begin(&tbd->stack);
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(&tbd->stack);
+  
+  // return if no elements
+  if (tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
+  {
+    return total_printed;;
+  }
+  
+
+  // go to first non-garbage item
+  while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
+  {
+    if (!tbd_keyvalue_is_garbage(iter.ptr))
+    {
+      break;
+    }
+      
+    tbd_keyvalue_stack_const_iterator_next(&iter);
+  }
+  
+  
+  // return if all garbage
+  if (tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
+  {
+    return total_printed;;
+  }
+  
+  
+  // print opening bracket
+  printed = snprintf(json, json_size, "[");
+  
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;
+  
+  
+  // print first key
+  printed = tbd_key_to_json(json, json_size, &iter.ptr->key, key_format);
+
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;
+  
+  tbd_keyvalue_stack_const_iterator_next(&iter);
+
+  
+  // print the rest of the keys
+  while (!tbd_keyvalue_stack_const_iterator_is_equal(&end, &iter))
+  {  
+    printed = snprintf(json, json_size, ",");
+
+    total_printed += printed;    
+    json += printed;
+    json_size -= printed;
+        
+    printed = tbd_key_to_json(json, json_size, &iter.ptr->key, key_format);
+    
+    total_printed += printed;    
+    json += printed;
+    json_size -= printed;
+        
+    tbd_keyvalue_stack_const_iterator_next(&iter);
+  }
+  
+  
+  // print closing bracket
+  printed = snprintf(json, json_size, "]");
+  
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;  
+  
+  
+#endif//TBD_INCLUDE_STDIO
   
   return total_printed;
 }
