@@ -41,6 +41,7 @@
 
 
 #include <stddef.h>
+#include <stdlib.h>
 
 
 
@@ -48,16 +49,18 @@
 /** Maximum number of characters for a tbd key.  Includes null terminator.
  */
 #define TBD_SIZE_T            size_t
-#define TBD_MAX_SIZE          ((TBD_SIZE_T) -1)
+#define TBD_MAX_SIZE          (0x8000u)
 #define TBD_MAX_KEY_LENGTH    (8u)
 
 
 /* Forward declarations for opaque structures. */
 struct tbd_struct;
+struct tbd_const_iterator_struct;
 
 
 /* Type definitions for opaque structures. */
 typedef struct tbd_struct tbd_t;
+typedef struct tbd_const_iterator_struct tbd_const_iterator_t;
 
 
 
@@ -157,6 +160,11 @@ TBD_SIZE_T tbd_max_key_length(const tbd_t* tbd);
 int tbd_copy(tbd_t* dest, const tbd_t* src);
 
 
+/** Sort the tbd keyvalues in key order.
+ */
+int tbd_sort(tbd_t* tbd);
+
+
 
 
 /* 
@@ -205,6 +213,67 @@ int tbd_delete(tbd_t* tbd, const char* key);
 /** Get the size of a value from the data store.
  */
 size_t tbd_read_size(tbd_t* tbd, const char* key);
+
+
+
+
+
+
+
+
+/*
+ * Iterator operations
+ *
+ * Provides functions to iterate over the data store.
+ * These operations are intended to be read-only.
+ * When manipulating data store, use CRUD functions.
+ * 
+ */
+
+struct tbd_const_iterator_struct
+{
+  const void* ptr;  ///< Nothing to see here, move along.
+};   
+
+
+/** Get forward iterator to first keyvalue element.
+ */
+tbd_const_iterator_t tbd_const_begin(const tbd_t* tbd);
+
+
+/** Get forward iterator to end+1 keyvalue element.
+ */
+tbd_const_iterator_t tbd_const_end(const tbd_t* tbd);
+
+
+/** Move iterator to next element.
+ */
+tbd_const_iterator_t tbd_const_iterator_next(tbd_const_iterator_t i);
+
+
+/** Returns 1 if the two iterators represent the same element.
+ */
+int tbd_const_iterator_is_equal(tbd_const_iterator_t a, tbd_const_iterator_t b);
+
+
+/** Get pointer to key pointed to by iterator.
+ * Will return NULL if iterator is invalid.
+ */
+const char* tbd_const_iterator_key(const tbd_const_iterator_t i);
+
+
+/** Get the size in bytes of the value pointed to by iterator.
+ */
+size_t tbd_const_iterator_value_size(const tbd_const_iterator_t i);
+
+
+/** Get the pointer to the value pointd to by the iterator.
+ */
+const void* tbd_const_iterator_value(const tbd_const_iterator_t i);
+
+
+
+
 
 
 
@@ -271,23 +340,23 @@ size_t tbd_garbage_clean(tbd_t* tbd);
  */
 typedef struct tbd_stats_struct
 {
-  unsigned tbd_address;
+  const void* tbd_address;
   TBD_SIZE_T   tbd_size;
   TBD_SIZE_T   tbd_size_used;
   TBD_SIZE_T   tbd_head_size;
   
   TBD_SIZE_T   tbd_keyvalue_size;    ///< Size of a tbd_keyvalue_t element in bytes
   
-  unsigned stack_top;       ///< Address of top element.
-  unsigned stack_btm;       ///< Address of bottom element.
+  const void* stack_top;       ///< Address of top element.
+  const void* stack_btm;       ///< Address of bottom element.
   TBD_SIZE_T   stack_count;     ///< Number of elements in stack.
   TBD_SIZE_T   stack_size;      ///< Size of stack in bytes.
   
-  unsigned heap_top;        ///< Top of heap.
+  const void* heap_top;        ///< Top of heap.
   TBD_SIZE_T   heap_size;       ///< Size of heap in bytes.
   
-  unsigned garbage_front;   ///< First element of garbage.
-  unsigned garbage_back;    ///< Last element of garbage.
+  const void* garbage_front;   ///< First element of garbage.
+  const void* garbage_back;    ///< Last element of garbage.
   TBD_SIZE_T garbage_size;      ///< Number of bytes of garbage.
   TBD_SIZE_T garbage_count;     ///< Number of garbage elements.
   

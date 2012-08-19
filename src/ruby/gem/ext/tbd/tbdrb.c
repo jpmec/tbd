@@ -24,7 +24,8 @@ VALUE method_max_key_length(VALUE self);
 
 
 // The initialization method for this module
-void Init_tbdrb() {
+void Init_tbdrb() 
+{
 	TbdModule = rb_define_module("Tbdrb");
 
 	rb_define_method(TbdModule, "create", method_create, 2);	
@@ -55,7 +56,9 @@ VALUE method_max_key_length(VALUE self)
 
 
 
-VALUE method_create(VALUE self, VALUE key, VALUE value) {
+VALUE method_create(VALUE self, VALUE key, VALUE value) 
+{  
+  Check_Type(key, T_STRING);
   
   int result = tbd_create(tbd, RSTRING(key)->ptr, RSTRING(value)->ptr, RSTRING(value)->len + 1);
   
@@ -65,7 +68,9 @@ VALUE method_create(VALUE self, VALUE key, VALUE value) {
 
 
 
-VALUE method_read(VALUE self, VALUE key) {
+VALUE method_read(VALUE self, VALUE key) 
+{
+  Check_Type(key, T_STRING);
   
 	const size_t value_size = tbd_read_size(tbd, RSTRING(key)->ptr);
 	
@@ -82,7 +87,9 @@ VALUE method_read(VALUE self, VALUE key) {
 
 
 
-VALUE method_update(VALUE self, VALUE key, VALUE value) {
+VALUE method_update(VALUE self, VALUE key, VALUE value) 
+{
+  Check_Type(key, T_STRING);
   
   int result = tbd_update(tbd, RSTRING(key)->ptr, RSTRING(value)->ptr, RSTRING(value)->len + 1);
   
@@ -92,7 +99,9 @@ VALUE method_update(VALUE self, VALUE key, VALUE value) {
 
 
 
-VALUE method_delete(VALUE self, VALUE key) {
+VALUE method_delete(VALUE self, VALUE key) 
+{
+  Check_Type(key, T_STRING);
   
   int result = tbd_delete(tbd, RSTRING(key)->ptr);
   

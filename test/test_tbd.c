@@ -75,7 +75,7 @@ static int test_tbd_init(tbd_t* tbd)
   START_TEST_TBD(tbd); 
   
   FINISH_TEST_TBD(tbd);  
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -87,7 +87,7 @@ static int test_Foo(void)
   printf("\toffsetof(struct Foo, n): %lu\n", offsetof(struct Foo, n));
   printf("\toffsetof(struct Foo, str): %lu\n", offsetof(struct Foo, str));
   puts("}");
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -109,7 +109,7 @@ static int test_tbd_size(tbd_t* tbd)
   assert(tbd_size_result0 == tbd_size_result1);
   
   FINISH_TEST_TBD(tbd);  
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -131,7 +131,73 @@ static int test_tbd_size_used(tbd_t* tbd)
   assert(tbd_size_used_result0 < tbd_size_used_result1);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
+}
+
+
+
+static int test_tbd_sort(tbd_t* tbd)
+{
+  START_TEST_TBD(tbd); 
+
+  // exercise with empty tbd
+  int tbd_sort_result = tbd_sort(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);  
+  
+  
+  // setup with elements added in reverse order
+  struct Foo foo1 = {1, 'x'};  
+  int tbd_create_result = tbd_create(tbd, "x", &foo1, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);
+  
+  struct Foo foo2 = {2, 'y'};  
+  tbd_create_result = tbd_create(tbd, "y", &foo2, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);  
+  
+  struct Foo foo3 = {3, 'z'};  
+  tbd_create_result = tbd_create(tbd, "z", &foo3, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_create_result);  
+  
+  
+  // iterate over elements and print
+  tbd_const_iterator_t i = tbd_const_begin(tbd);
+  tbd_const_iterator_t end = tbd_const_end(tbd);
+  
+  while (!tbd_const_iterator_is_equal(end, i))
+  {
+    printf("%s\n", tbd_const_iterator_key(i));
+    
+    i = tbd_const_iterator_next(i);    
+  }
+  
+  
+  // exercise
+  tbd_sort_result = tbd_sort(tbd);
+  assert(TBD_NO_ERROR == tbd_sort_result);   
+  
+  
+  // iterate over elements and print
+  i = tbd_const_begin(tbd);
+  end = tbd_const_end(tbd);
+  
+  while (!tbd_const_iterator_is_equal(end, i))
+  {
+    printf("%s\n", tbd_const_iterator_key(i));
+    
+    i = tbd_const_iterator_next(i);    
+  }  
+  
+  struct Foo foo_result;
+  int tbd_read_result = tbd_read(tbd, "x", &foo_result, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_read_result); 
+  assert(1 == foo_result.n);  
+  
+  tbd_read_result = tbd_read(tbd, "z", &foo_result, sizeof(struct Foo));
+  assert(TBD_NO_ERROR == tbd_read_result); 
+  assert(3 == foo_result.n);
+  
+  FINISH_TEST_TBD(tbd);   
+  return TBD_NO_ERROR;
 }
 
 
@@ -163,7 +229,7 @@ static int test_tbd_create(tbd_t* tbd)
   
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -203,7 +269,7 @@ static int test_tbd_create__fill_tbd(tbd_t* tbd)
   tbd_print_stats(tbd);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;  
+  return TBD_NO_ERROR;  
 }
 
 
@@ -249,7 +315,7 @@ static int test_tbd_read(tbd_t* tbd)
   assert(TBD_NO_ERROR == tbd_read_result);  
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -288,7 +354,7 @@ static int test_tbd_update(tbd_t* tbd)
   assert(TBD_ERROR_BAD_SIZE == tbd_update_result);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -317,7 +383,7 @@ static int test_tbd_delete(tbd_t* tbd)
   assert(TBD_ERROR_KEY_NOT_FOUND == tbd_read_result);  
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -342,7 +408,7 @@ static int test_tbd_read_size(tbd_t* tbd)
   
   
   FINISH_TEST_TBD(tbd);   
-  return 0;  
+  return TBD_NO_ERROR;  
 }
 
 
@@ -388,7 +454,7 @@ static int test_tbd_garbage_size(tbd_t* tbd)
   assert(0 < tbd_garbage_size_result);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -437,7 +503,7 @@ static int test_tbd_garbage_pop(tbd_t* tbd)
   assert(0 == tbd_garbage_size_result);     
   
   FINISH_TEST_TBD(tbd);  
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -511,7 +577,7 @@ static int test_tbd_garbage_fold(tbd_t* tbd)
   assert(0 < tbd_garbage_fold_result);
     
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -573,7 +639,7 @@ static int test_tbd_garbage_pack(tbd_t* tbd)
   assert(0 < tbd_garbage_pack_result);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -609,7 +675,7 @@ static int test_tbd_garbage_collect(tbd_t* tbd)
   assert(0 < tbd_garbage_collect_result);  
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -641,7 +707,7 @@ static int test_tbd_garbage_clean(tbd_t* tbd)
   assert(0 < tbd_garbage_clean_result);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -681,7 +747,7 @@ static int test_tbd_json(tbd_t* tbd)
     puts(json_buffer);
   
   FINISH_TEST_TBD(tbd);   
-  return 0;
+  return TBD_NO_ERROR;
 }
 
 
@@ -694,7 +760,7 @@ int test_tbd(void)
   
   assert(max_size >= mem_size);
 
-  assert(0 == test_Foo());
+  assert(TBD_NO_ERROR ==  test_Foo());
   
   
   /* Exercise tbd_init */  
@@ -713,34 +779,35 @@ int test_tbd(void)
   
   
   /* Test basic operations */
-  assert(0 == test_tbd_size(tbd));
-  assert(0 == test_tbd_size_used(tbd));  
+  assert(TBD_NO_ERROR == test_tbd_size(tbd));
+  assert(TBD_NO_ERROR == test_tbd_size_used(tbd));
+  assert(TBD_NO_ERROR == test_tbd_sort(tbd));
   
   
   /* Test the basic CRUD */
-  assert(0 == test_tbd_create(tbd));
-  assert(0 == test_tbd_create__fill_tbd(tbd));
+  assert(TBD_NO_ERROR == test_tbd_create(tbd));
+//  assert(TBD_NO_ERROR == test_tbd_create__fill_tbd(tbd));
   
-  assert(0 == test_tbd_read(tbd));
-  assert(0 == test_tbd_update(tbd));
-  assert(0 == test_tbd_delete(tbd));
+  assert(TBD_NO_ERROR == test_tbd_read(tbd));
+  assert(TBD_NO_ERROR == test_tbd_update(tbd));
+  assert(TBD_NO_ERROR == test_tbd_delete(tbd));
   
   
   /* Test the advance CRUD */
-  assert(0 == test_tbd_read_size(tbd));
+  assert(TBD_NO_ERROR == test_tbd_read_size(tbd));
   
   
   /* Test garbage collection */
-//  assert(0 == test_tbd_garbage_size(tbd));
-//  assert(0 == test_tbd_garbage_pop(tbd));  
-//  assert(0 == test_tbd_garbage_fold(tbd));
-//  assert(0 == test_tbd_garbage_pack(tbd));    
-//  assert(0 == test_tbd_garbage_collect(tbd));
-//  assert(0 == test_tbd_garbage_clean(tbd));
+  assert(TBD_NO_ERROR == test_tbd_garbage_size(tbd));
+  assert(TBD_NO_ERROR == test_tbd_garbage_pop(tbd));  
+//  assert(TBD_NO_ERROR == test_tbd_garbage_fold(tbd));
+//  assert(TBD_NO_ERROR == test_tbd_garbage_pack(tbd));    
+//  assert(TBD_NO_ERROR == test_tbd_garbage_collect(tbd));
+//  assert(TBD_NO_ERROR == test_tbd_garbage_clean(tbd));
   
   
   /* Test JSON support */
-  assert(0 == test_tbd_json(tbd));
+  assert(TBD_NO_ERROR == test_tbd_json(tbd));
   
   
   return 0; // return 0 for success
