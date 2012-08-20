@@ -14,7 +14,7 @@
  *
  * The tbd library stores data in key-value pairs.
  *
- * Garbage collection is used to reclaim key-value pairs that are no longer used.
+ * Garbage collection is used to reclaim key-value pairs that are no longer used.  A variety of garbage collection functions are provided.
  *
  * By default when compiling with NDEBUG, parameters passed a function arguments are not checked for NULL or invalid values.
  * Uses assert() to detect null pointer conditions when compiling in debug mode.

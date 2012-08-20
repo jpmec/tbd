@@ -936,7 +936,7 @@ int test_tbd(void)
   /* Test garbage collection */
   assert(TBD_NO_ERROR == test_tbd_garbage_size(tbd));
   assert(TBD_NO_ERROR == test_tbd_garbage_merge(tbd));
-//  assert(TBD_NO_ERROR == test_tbd_garbage_pop(tbd));  
+  assert(TBD_NO_ERROR == test_tbd_garbage_pop(tbd));  
 //  assert(TBD_NO_ERROR == test_tbd_garbage_fold(tbd));
 //  assert(TBD_NO_ERROR == test_tbd_garbage_pack(tbd));    
 //  assert(TBD_NO_ERROR == test_tbd_garbage_collect(tbd));

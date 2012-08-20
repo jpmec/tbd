@@ -151,7 +151,9 @@
 
 
 
-
+/*
+ * Define rules for structure alignment.
+ */
 #if defined(TBD_USE_PACKED_STRUCTS)
 
   #define TBD_BEGIN_PACKED_STRUCT    _Pragma("pack(1)")
@@ -167,10 +169,21 @@
 
 
 
+#define TBD_BEGIN_STRUCT(_name_) \
+  TBD_BEGIN_PACKED_STRUCT \
+  typedef struct _name_##_struct
+
+
+#define TBD_END_STRUCT(_name_) \
+  _name_##_t; \
+  TBD_END_PACKED_STRUCT
+
+
+
+
 /** Key reference structure.
  */
-TBD_BEGIN_PACKED_STRUCT
-typedef struct tbd_key_struct
+TBD_BEGIN_STRUCT(tbd_key)
 {
   char* str;           ///< Pointer to key string data.
   
@@ -178,8 +191,8 @@ typedef struct tbd_key_struct
   TBD_SIZE_T size;     ///< Size in bytes of key string data.
 #endif  
   
-} tbd_key_t;
-TBD_END_PACKED_STRUCT
+}
+TBD_END_STRUCT(tbd_key)
 
 
 
@@ -217,8 +230,7 @@ static TBD_SIZE_T tbd_key_size(const tbd_key_t* key)
 
 /** Value reference structure.
  */
-TBD_BEGIN_PACKED_STRUCT
-typedef struct tbd_value_struct
+TBD_BEGIN_STRUCT(tbd_value)
 {
   unsigned char* data;     ///< Pointer to generic stored data.
  
@@ -226,8 +238,9 @@ typedef struct tbd_value_struct
   TBD_TBD_SIZE_T size;     ///< Size in bytes of generic stored data.
 #endif
   
-} tbd_value_t;
-TBD_END_PACKED_STRUCT
+} 
+TBD_END_STRUCT(tbd_value)
+
 
 
 
@@ -267,14 +280,13 @@ static TBD_SIZE_T tbd_value_size(const tbd_value_t* self)
 /** Heap structure.
  *  Represents range of contiguous memory.
  */
-TBD_BEGIN_PACKED_STRUCT
-typedef struct tbd_heap_struct
+TBD_BEGIN_STRUCT(tbd_heap)
 {
   unsigned char* top;       ///< Pointer to top of heap.
   TBD_SIZE_T size;          ///< Size in bytes of allocated heap. 
   
-} tbd_heap_t;
-TBD_END_PACKED_STRUCT
+} 
+TBD_END_STRUCT(tbd_heap)
 
 
 
@@ -394,21 +406,19 @@ static unsigned char* tbd_heap_pop(tbd_heap_t* heap, TBD_SIZE_T hunk_size)
 
 /** Structure to hold single-bit flags.
  */
-TBD_BEGIN_PACKED_STRUCT
-typedef struct tbd_keyvalue_flags
+TBD_BEGIN_STRUCT(tbd_keyvalue_flags)
 {
   unsigned char is_garbage : 1;
   
-} tbd_keyvalue_flags_t;
-TBD_END_PACKED_STRUCT
+} 
+TBD_END_STRUCT(tbd_keyvalue_flags)
 
 
 
 
 /** Key-Value pair structure.
  */
-TBD_BEGIN_PACKED_STRUCT
-typedef struct tbd_keyvalue_struct
+TBD_BEGIN_STRUCT(tbd_keyvalue)
 { 
   tbd_heap_t heap;             ///< Heap data allocated to this keyvalue.
   tbd_key_t key;               ///< The key reference.
@@ -420,8 +430,8 @@ typedef struct tbd_keyvalue_struct
   struct tbd_keyvalue_struct* next_garbage;    ///< Pointer to next element after this that is garbage.
 #endif  
   
-} tbd_keyvalue_t;
-TBD_END_PACKED_STRUCT
+} 
+TBD_END_STRUCT(tbd_keyvalue)
 
 
 
@@ -2124,7 +2134,7 @@ TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
   
   tbd_keyvalue_t* ptr = tbd_garbage_list_last(&tbd->garbage);
   
-  while (ptr && (ptr->value.data == tbd->heap.top))
+  while (ptr && (ptr->heap.top == tbd->heap.top))
   {
     const size_t keyvalue_size = tbd_keyvalue_size(ptr);
     
@@ -2135,10 +2145,10 @@ TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
     
     pop_total += keyvalue_size;
     
-    size_t pop_offset = ptr->heap.size;
-    tbd->heap.top += pop_offset;
+    TBD_SIZE_T heap_size = tbd_heap_size(&ptr->heap);
     
-    --tbd->stack.count;
+    tbd_heap_pop(&tbd->heap, heap_size);
+    tbd_keyvalue_stack_pop(&tbd->stack);
     
     if (ptr == tbd->garbage.front)
     {
