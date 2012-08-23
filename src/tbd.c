@@ -1278,10 +1278,10 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
   else
   {
     // find the insertion point
-    tbd_keyvalue_t* prev = garbage->front;
-    tbd_keyvalue_t* next = garbage->front->next_garbage;
+    tbd_keyvalue_t* prev = NULL;
+    tbd_keyvalue_t* next = garbage->front;
     
-    while ( (next) && (tbd_keyvalue_size(next) < tbd_keyvalue_size(keyvalue)) )
+    while ( (next) && (next->heap.top < keyvalue->heap.top) )
     {
       prev = next;
       next = next->next_garbage;         
@@ -1296,7 +1296,15 @@ static void tbd_garbage_list_insert(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
     }
     
     // insert the sub list
-    prev->next_garbage = keyvalue;
+    if (prev)
+    {
+      prev->next_garbage = keyvalue;
+    }
+    else
+    {
+      garbage->front = keyvalue;  
+    }
+    
     keyvalue->prev_garbage = prev;
     
     if (next && (next != prev))
@@ -1345,7 +1353,33 @@ static void tbd_garbage_list_delete(tbd_garbage_list_t* garbage, tbd_keyvalue_t*
 }
 
 
+
+
+static void tbd_garbage_list_pop(tbd_garbage_list_t* garbage)
+{
+  TBD_ASSERT(garbage);
+  
+  tbd_keyvalue_t* keyvalue = garbage->front;
+  
+  if (!keyvalue)
+  {
+    return;
+  }
+  
+  garbage->front = keyvalue->next_garbage;
+  
+  if (keyvalue == garbage->back)
+  {
+    garbage->back = NULL;
+  }
+}
+
+
+
+
 #endif//TBD_USE_GARBAGE_LIST
+
+
 
 
 
@@ -1395,6 +1429,86 @@ static TBD_SIZE_T tbd_keyvalue_hunk_size(const tbd_t* tbd, TBD_SIZE_T key_size, 
   
   return hunk_count * tbd->hunk_size;
 }
+
+
+
+
+
+
+
+
+#ifdef TBD_USE_GARBAGE_LIST
+
+
+
+
+/** Iterator structure for garbage list.
+ */
+typedef struct tbd_garbage_list_iterator_struct
+{
+  tbd_keyvalue_t* ptr; 
+  
+} tbd_garbage_list_iterator_t;
+
+
+
+
+static tbd_garbage_list_iterator_t tbd_garbage_list_begin(tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  return (tbd_garbage_list_iterator_t) {.ptr = tbd->garbage.front};
+}
+
+
+
+
+static void tbd_garbage_list_iterator_next(tbd_garbage_list_iterator_t* iter)
+{
+  TBD_ASSERT(iter);
+  
+  iter->ptr = iter->ptr->next_garbage;
+}
+
+
+
+
+/** Iterator structure for garbage list.
+ */
+typedef struct tbd_garbage_list_const_iterator_struct
+{
+  const tbd_keyvalue_t* ptr; 
+  
+} tbd_garbage_list_const_iterator_t;
+
+
+
+
+static tbd_garbage_list_const_iterator_t tbd_garbage_list_const_begin(const tbd_t* tbd)
+{
+  TBD_ASSERT(tbd);
+  
+  return (tbd_garbage_list_const_iterator_t) {.ptr = tbd->garbage.front};
+}
+
+
+
+
+static void tbd_garbage_list_const_iterator_next(tbd_garbage_list_const_iterator_t* iter)
+{
+  TBD_ASSERT(iter);
+  
+  iter->ptr = iter->ptr->next_garbage;
+}
+
+
+
+
+#endif//TBD_USE_GARBAGE_LIST
+
+
+
+
 
 
 
@@ -2114,6 +2228,8 @@ TBD_SIZE_T tbd_garbage_merge(tbd_t* tbd)
 
 
 
+/** TODO: Remove use of garbage list
+ */
 TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
 {
   TBD_ASSERT(tbd);
@@ -2124,19 +2240,15 @@ TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
   {
     return 0;
   }
+    
   
-#if defined(TBD_USE_GARBAGE_LIST)
+  tbd_keyvalue_stack_iterator_t iter = tbd_keyvalue_stack_begin(&tbd->stack);  
+  tbd_keyvalue_stack_const_iterator_t end = tbd_keyvalue_stack_end(&tbd->stack);
   
-  if (!tbd->garbage.front)
+
+  while (!tbd_keyvalue_stack_iterator_is_equal(&end, &iter) && tbd_keyvalue_is_garbage(iter.ptr) &&(iter.ptr->heap.top == tbd->heap.top))
   {
-    return 0;
-  }
-  
-  tbd_keyvalue_t* ptr = tbd_garbage_list_last(&tbd->garbage);
-  
-  while (ptr && (ptr->heap.top == tbd->heap.top))
-  {
-    const size_t keyvalue_size = tbd_keyvalue_size(ptr);
+    const size_t keyvalue_size = tbd_keyvalue_size(iter.ptr);
     
     if ((pop_total + keyvalue_size) > garbage_limit)
     {
@@ -2145,20 +2257,19 @@ TBD_SIZE_T tbd_garbage_pop(tbd_t* tbd, size_t garbage_limit)
     
     pop_total += keyvalue_size;
     
-    TBD_SIZE_T heap_size = tbd_heap_size(&ptr->heap);
+    TBD_SIZE_T heap_size = tbd_heap_size(&iter.ptr->heap);
     
     tbd_heap_pop(&tbd->heap, heap_size);
     tbd_keyvalue_stack_pop(&tbd->stack);
+    tbd_garbage_list_delete(&tbd->garbage, iter.ptr);
     
-    if (ptr == tbd->garbage.front)
+    if (!tbd_keyvalue_stack_count(&tbd->stack))
     {
-      tbd->garbage.front = NULL;
+      break;
     }
     
-    ptr = ptr->prev_garbage;
+    iter = tbd_keyvalue_stack_begin(&tbd->stack); 
   }
-  
-#endif  
   
   return pop_total;
 }
@@ -2590,6 +2701,26 @@ static size_t tbd_value_to_json(char* json, size_t json_size, const tbd_value_t*
 
 
 
+static size_t tbd_heap_to_json(char* json, size_t json_size, const tbd_heap_t* heap)
+{
+  TBD_ASSERT(json);
+  TBD_ASSERT(json_size);
+  TBD_ASSERT(heap);
+  
+  size_t total_printed = 0;
+  
+#ifdef TBD_INCLUDE_STDIO  
+
+  total_printed += snprintf(json, json_size, "{%p : %lx}", heap->top, heap->size);  
+  
+#endif
+  
+  return total_printed;
+}
+
+
+
+
 size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, const char* key, TBD_KEY_TO_JSON_FORMAT_ENUM key_format, TBD_VALUE_TO_JSON_FORMAT_ENUM value_format)
 {
   TBD_ASSERT(json);
@@ -2718,6 +2849,82 @@ size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_
       json_size -= printed;
     }   
     tbd_keyvalue_stack_const_iterator_next(&iter);
+  }
+  
+  
+  // print closing bracket
+  printed = snprintf(json, json_size, "]");
+  
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;  
+  
+  
+#endif//TBD_INCLUDE_STDIO
+  
+  return total_printed;
+}
+
+
+
+
+size_t tbd_garbage_list_to_json(char* json, size_t json_size, const tbd_t* tbd)
+{
+  TBD_ASSERT(json);
+  TBD_ASSERT(json_size);
+  TBD_ASSERT(tbd);
+  
+  
+  size_t total_printed = 0;
+  
+#ifdef TBD_INCLUDE_STDIO  
+  
+  size_t printed = 0;
+  
+  tbd_garbage_list_const_iterator_t iter = tbd_garbage_list_const_begin(tbd);
+  
+  // return if no elements
+  if (!iter.ptr)
+  {
+    total_printed = snprintf(json, json_size, "[]"); // print empty array
+    return total_printed;
+  }
+  
+  
+  // print opening bracket
+  printed = snprintf(json, json_size, "[");
+  
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;
+  
+  
+  // print first key
+  printed = tbd_heap_to_json(json, json_size, &iter.ptr->heap);
+  
+  total_printed += printed;
+  json += printed;
+  json_size -= printed;
+  
+  tbd_garbage_list_const_iterator_next(&iter);
+  
+  
+  // print the rest of the garbage list
+  while (iter.ptr)
+  {
+    printed = snprintf(json, json_size, ",");
+      
+    total_printed += printed;    
+    json += printed;
+    json_size -= printed;      
+      
+    printed = tbd_heap_to_json(json, json_size, &iter.ptr->heap);
+      
+    total_printed += printed;    
+    json += printed;
+    json_size -= printed;
+    
+    tbd_garbage_list_const_iterator_next(&iter);
   }
   
   

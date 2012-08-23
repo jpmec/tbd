@@ -637,6 +637,62 @@ static int test_tbd_garbage_pop(tbd_t* tbd)
   tbd_garbage_size_result = tbd_garbage_size(tbd);
   assert(0 == tbd_garbage_size_result);     
   
+  
+  // Setup with some sample objects
+  setup_tbd_with_Foo(tbd);
+  tbd_print_stats(tbd);  
+  
+  tbd_garbage_list_to_json(json_buffer, sizeof(json_buffer), tbd);
+  puts(json_buffer);
+  
+  // delete an element from in the middle of the stack
+  tbd_delete_result = tbd_delete(tbd, "y");
+  assert(TBD_NO_ERROR ==  tbd_delete_result);
+  tbd_print_stats(tbd);  
+
+  tbd_garbage_list_to_json(json_buffer, sizeof(json_buffer), tbd);
+  puts(json_buffer);  
+  
+  // exercise, no data should be popped
+  tbd_garbage_size_result = tbd_garbage_size(tbd);
+  assert(0 < tbd_garbage_size_result);
+
+  TBD_SIZE_T tbd_garbage_count_result = tbd_garbage_count(tbd);
+  assert(1 == tbd_garbage_count_result);  
+  
+  tbd_garbage_pop_result = tbd_garbage_pop(tbd, tbd_garbage_size_result);
+  assert(0 == tbd_garbage_pop_result);
+  tbd_print_stats(tbd);
+  
+  tbd_garbage_list_to_json(json_buffer, sizeof(json_buffer), tbd);
+  puts(json_buffer);  
+  
+  // delete an element from in the top of the stack
+  tbd_delete_result = tbd_delete(tbd, "z");
+  assert(TBD_NO_ERROR ==  tbd_delete_result);
+  tbd_print_stats(tbd);
+  
+  tbd_garbage_list_to_json(json_buffer, sizeof(json_buffer), tbd);
+  puts(json_buffer);
+  
+  tbd_garbage_count_result = tbd_garbage_count(tbd);
+  assert(2 == tbd_garbage_count_result); 
+  
+  tbd_garbage_size_result = tbd_garbage_size(tbd);
+  assert(0 < tbd_garbage_size_result);
+  
+  // exercise, expect to pop top two elements
+  tbd_garbage_pop_result = tbd_garbage_pop(tbd, tbd_garbage_size_result);
+  assert(0 < tbd_garbage_pop_result);
+  tbd_print_stats(tbd);  
+  
+  tbd_garbage_list_to_json(json_buffer, sizeof(json_buffer), tbd);
+  puts(json_buffer);  
+  
+  tbd_garbage_count_result = tbd_garbage_count(tbd);
+  assert(0 == tbd_garbage_count_result);
+  
+  
   FINISH_TEST_TBD(tbd);  
   return TBD_NO_ERROR;
 }

@@ -457,6 +457,12 @@ size_t tbd_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JS
 size_t tbd_keys_to_json(char* json, size_t json_size, const tbd_t* tbd, TBD_KEY_TO_JSON_FORMAT_ENUM key_format);
 
 
+/** Convert tbd garbage to json formatted array.  Writes to json string, result is null terminated.
+ *  Returns number of bytes written.
+ */
+size_t tbd_garbage_list_to_json(char* json, size_t json_size, const tbd_t* tbd);
+
+
 /** Convert a keyvalue pair to json format.
  */
 size_t tbd_keyvalue_to_json(char* json, size_t json_size, const tbd_t* tbd, const char* key, TBD_KEY_TO_JSON_FORMAT_ENUM key_format, TBD_VALUE_TO_JSON_FORMAT_ENUM value_format);
